@@ -62,7 +62,7 @@ function init() {
     /////roll-over sphere/////
 
     const rollOverGeo = new THREE.SphereGeometry(35, 32, 32);
-    rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
+    rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xe2fa07, opacity: 0.5, transparent: true });
     rollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMaterial);
     scene.add(rollOverMesh);
 
