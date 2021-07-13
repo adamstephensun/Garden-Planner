@@ -2,7 +2,7 @@ import * as THREE from "https://unpkg.com/three@0.126.1/build/three.module.js";
 
 import { OrbitControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/OrbitControls.js";
 import { ConvexGeometry } from "https://unpkg.com/three@0.126.1/examples/jsm/geometries/ConvexGeometry.js";
-
+//test
 let camera, scene, renderer, controls;
 let planeMesh, planeMaterial;
 let pointer, raycaster, isShiftDown = false;
@@ -91,8 +91,8 @@ function init() {
         color: 0xdddddd,
         specular: 0x222222,
         shininess: 5,
-        //map: textureLoader.load('textures/grass/diffuse.jpg'),
-        //normalMap: textureLoader.load('textures/grass/normal.jpg'),
+        map: textureLoader.load('textures/grass/diffuse.jpg'),
+        normalMap: textureLoader.load('textures/grass/normal.jpg'),
         side: THREE.DoubleSide
     })
 
