@@ -91,8 +91,8 @@ function init() {
         color: 0xdddddd,
         specular: 0x222222,
         shininess: 5,
-        map: textureLoader.load('textures/grass/diffuse.jpg'),
-        normalMap: textureLoader.load('textures/grass/normal.jpg'),
+        //map: textureLoader.load('textures/grass/diffuse.jpg'),
+        //normalMap: textureLoader.load('textures/grass/normal.jpg'),
         side: THREE.DoubleSide
     })
 
