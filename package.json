@@ -1,0 +1,15 @@
+{
+  "name": "project-1-old",
+  "version": "1.0.0",
+  "description": "Garden Planner web app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "gh-pages -d dist"
+  },
+  "author": "Adam Stephenson",
+  "license": "ISC",
+  "dependencies": {
+    "gh-pages": "^3.2.3"
+  }
+}
