@@ -4,9 +4,12 @@ import { OrbitControls } from "https://unpkg.com/three@0.126.1/examples/jsm/cont
 import { ConvexGeometry } from "https://unpkg.com/three@0.126.1/examples/jsm/geometries/ConvexGeometry.js";
 import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.module.js";
 
-let camera, scene, renderer, controls;
-let planeMesh, planeMaterial;
+//#region declarations
+let camera, scene, renderer, controls, gui, world;
+let planeMesh, planeMaterial, gridHelper;
 let pointer, raycaster, isShiftDown = false;
+let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal;
+let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
 
 let rollOverMesh, rollOverMaterial;
 let spherePointerGeo, spherePointerMaterial, nodeID;
@@ -19,15 +22,19 @@ const nodes = [];
 const lines = [];
 const outlinePoints = [];
 
+const areaTypes = { grass: 'Grass', soil: 'Soil', gravel: 'Gravel', stone: 'Stone' };
+const currentAreaType = areaTypes.GRASS;
+
 const box = new THREE.Box3();
-const gui = new GUI();
+
+//#endregion declarations
 
 init();
 
 function init() {
 
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.set(500, 800, 1300);
+    camera.position.set(50, 80, 130);
     camera.lookAt(0, 0, 0);
 
     scene = new THREE.Scene();
@@ -42,7 +49,52 @@ function init() {
     outlineFinished = false;
     nodeID = 0;
 
-    /////controls/////
+    loadTextures();
+
+    //#region GUI
+
+    gui = new GUI();
+
+    world = {
+        plane: {
+            width: 100,
+            height: 100,
+            finalPlane: finalPlane
+        },
+        areaTypes: {
+            type: "grass"
+        }
+    }
+
+    const planeFolder = gui.addFolder("Plane");
+    planeFolder.add(world.plane, "width", 10, 200).
+        onChange(() => {
+            planeMesh.geometry.dispose();
+            planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
+            planeMesh.geometry.rotateX(- Math.PI / 2);
+        });
+    planeFolder.add(world.plane, "height", 10, 200).
+        onChange(() => {
+            planeMesh.geometry.dispose();
+            planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
+            planeMesh.geometry.rotateX(- Math.PI / 2);
+        });
+    planeFolder.add(world.plane, "finalPlane").name("Finalise plane");
+    planeFolder.open();
+
+
+    const areaFolder = gui.addFolder("Area");
+    areaFolder.add(world.areaTypes, "type").options(areaTypes).
+        onChange(() => {
+            console.log(world.areaTypes.type);
+        });
+
+    areaFolder.open();
+    //areaFolder.add()
+
+    //#endregion GUI
+
+    //#region controls
 
     controls = new OrbitControls(camera, renderer.domElement);
 
@@ -59,51 +111,49 @@ function init() {
         MIDDLE: THREE.MOUSE.DOLLY,
         RIGHT: THREE.MOUSE.ROTATE
     }
+    //#endregion controls
 
-    /////roll-over sphere/////
+    //#region spheres
 
-    const rollOverGeo = new THREE.SphereGeometry(35, 32, 32);
+    //////roll-over sphere/////
+
+    const rollOverGeo = new THREE.SphereGeometry(4, 32, 32);
     rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
     rollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMaterial);
     scene.add(rollOverMesh);
 
     /////node sphere/////
 
-    spherePointerGeo = new THREE.SphereGeometry(35, 32, 32);
+    spherePointerGeo = new THREE.SphereGeometry(4, 32, 32);
     spherePointerMaterial = new THREE.MeshLambertMaterial({ color: 0xe84118 });
 
-    //
+    //#endregion spheres
+
+    //#region raycast
 
     raycaster = new THREE.Raycaster();
     pointer = new THREE.Vector2();
 
-    /////plane & grid/////
+    //#endregion raycast
 
-    const gridHelper = new THREE.GridHelper(1000, 20, 0x000000, 0x3b3b3b);
-    scene.add(gridHelper);
-    gridHelper.position.y += 1;
+    //#region plane & grid
 
-    const planeGeo = new THREE.PlaneGeometry(1000, 1000);
+    //gridHelper = new THREE.GridHelper(world.plane.height, 20, 0x000000, 0x3b3b3b);
+    //gridHelper.position.y += 1;
+    //scene.add(gridHelper);
+
+    const planeGeo = new THREE.PlaneGeometry(100, 100);
     planeGeo.rotateX(- Math.PI / 2);
 
-    const textureLoader = new THREE.TextureLoader();
-
-    planeMaterial = new THREE.MeshPhongMaterial({
-        color: 0xdddddd,
-        specular: 0x222222,
-        shininess: 5,
-        map: textureLoader.load('textures/grass/diffuse.jpg'),
-        normalMap: textureLoader.load('textures/grass/normal.jpg'),
-        side: THREE.DoubleSide
-    })
-
-    planeMesh = new THREE.Mesh(planeGeo, planeMaterial);
+    planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
     planeMesh.name = "plane";
     scene.add(planeMesh);
 
     objects.push(planeMesh);
 
-    /////lights/////
+    //#endregion plane & grid
+
+    //#region lights
 
     const ambientLight = new THREE.AmbientLight(0x606060);
     scene.add(ambientLight);
@@ -112,17 +162,97 @@ function init() {
     directionalLight.position.set(1, 0.75, 0.5).normalize();
     scene.add(directionalLight);
 
-    /////listeners/////
+    //#endregion lights
+
+    //#region listeners
 
     document.addEventListener('pointermove', onPointerMove);
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onDocumentKeyDown);
     document.addEventListener('keyup', onDocumentKeyUp);
-
-    //
-
     window.addEventListener('resize', onWindowResize);
 
+    //#endregion listeners
+
+
+}
+
+function loadTextures() {
+    grassTexture = new THREE.TextureLoader().load('textures/grass/diffuse.jpg');
+    grassTexture.wrapS = THREE.RepeatWrapping;
+    grassTexture.wrapT = THREE.RepeatWrapping;
+    grassTexture.repeat.set(4, 4);
+
+    grassNormal = new THREE.TextureLoader().load('textures/grass/normal.jpg');
+    grassNormal.wrapS = THREE.RepeatWrapping;
+    grassNormal.wrapT = THREE.RepeatWrapping;
+    grassNormal.repeat.set(4, 4);
+
+    grassMaterial = new THREE.MeshPhongMaterial({
+        color: 0xdddddd,
+        specular: 0x222222,
+        shininess: 5,
+        map: grassTexture,
+        normalMap: grassNormal,
+        side: THREE.DoubleSide
+    })
+
+    soilTexture = new THREE.TextureLoader().load('textures/soil/diffuse.jpg');
+    soilTexture.wrapS = THREE.RepeatWrapping;
+    soilTexture.wrapT = THREE.RepeatWrapping;
+    soilTexture.repeat.set(4, 4);
+
+    soilNormal = new THREE.TextureLoader().load('textures/soil/normal.jpg');
+    soilNormal.wrapS = THREE.RepeatWrapping;
+    soilNormal.wrapT = THREE.RepeatWrapping;
+    soilNormal.repeat.set(4, 4);
+
+    soilMaterial = new THREE.MeshPhongMaterial({
+        color: 0xdddddd,
+        specular: 0x222222,
+        shininess: 5,
+        map: soilTexture,
+        normalMap: soilNormal,
+        side: THREE.DoubleSide
+    })
+
+    gravelTexture = new THREE.TextureLoader().load('textures/gravel/diffuse.jpg');
+    gravelTexture.wrapS = THREE.RepeatWrapping;
+    gravelTexture.wrapT = THREE.RepeatWrapping;
+    gravelTexture.repeat.set(4, 4);
+
+    gravelNormal = new THREE.TextureLoader().load('textures/gravel/normal.jpg');
+    gravelNormal.wrapS = THREE.RepeatWrapping;
+    gravelNormal.wrapT = THREE.RepeatWrapping;
+    gravelNormal.repeat.set(4, 4);
+
+    gravelMaterial = new THREE.MeshPhongMaterial({
+        color: 0xdddddd,
+        specular: 0x222222,
+        shininess: 5,
+        map: gravelTexture,
+        normalMap: gravelNormal,
+        side: THREE.DoubleSide
+    })
+
+    stoneTexture = new THREE.TextureLoader().load('textures/stone/diffuse.png');
+    stoneTexture.wrapS = THREE.RepeatWrapping;
+    stoneTexture.wrapT = THREE.RepeatWrapping;
+    stoneTexture.repeat.set(4, 4);
+
+    stoneNormal = new THREE.TextureLoader().load('textures/stone/normal.png');
+    stoneNormal.wrapS = THREE.RepeatWrapping;
+    stoneNormal.wrapT = THREE.RepeatWrapping;
+    stoneNormal.repeat.set(4, 4);
+
+    stoneMaterial = new THREE.MeshPhongMaterial({
+        color: 0xdddddd,
+        specular: 0x222222,
+        shininess: 5,
+        map: stoneTexture,
+        normalMap: stoneNormal,
+        side: THREE.DoubleSide
+    })
 }
 
 function onWindowResize() {
@@ -162,22 +292,23 @@ function onPointerDown(event) {
     switch (event.which) {
         case 1: //left click
             if (!outlineFinished) {
+
                 pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                 raycaster.setFromCamera(pointer, camera);
                 const intersects = raycaster.intersectObjects(objects);
 
-                if (intersects.length > 0) {
+                if (intersects.length > 0) {    //If ray intersects with something
 
                     const intersect = intersects[0];
-                    if (objects.includes(intersect.object));
+                    if (objects.includes(intersect.object));    //if intersect is included in the objects array
                     {
-                        const nodeMesh = new THREE.Mesh(spherePointerGeo, spherePointerMaterial);
-                        nodeMesh.position.copy(intersect.point).add(intersect.face.normal);
-                        //voxel.position.divideScalar(50).floor().multiplyScalar(50).addScalar(25);
-                        scene.add(nodeMesh);
-                        nodeMesh.name = "node " + nodeID;
-                        nodeID++;
-                        nodes.push(nodeMesh);
+                        const nodeMesh = new THREE.Mesh(spherePointerGeo, spherePointerMaterial);   //Create mesh for solid sphere
+                        nodeMesh.position.copy(intersect.point).add(intersect.face.normal);         //set mesh to intersect position
+                        scene.add(nodeMesh);        //Add mesh to scene
+
+                        nodeMesh.name = "node " + nodeID;   //Give the node a name 
+                        nodeID++;       //increment id 
+                        nodes.push(nodeMesh);               //Push node to the array of nodes
                         console.log("Pushed node ID:" + nodeID);
 
                         const pos = nodeMesh.position;     //temp variable to store the point
@@ -186,6 +317,10 @@ function onPointerDown(event) {
 
                         if (outlinePoints.length > 1) {
                             drawLine();
+                        }
+
+                        if (outlinePoints.length == 4) {    //Finishes the outline on four points
+                            finalOutline();
                         }
                     }
                 }
@@ -241,11 +376,39 @@ function finalOutline() {
         outlineFinished = true;
 
         areaGeo = new ConvexGeometry(outlinePoints);
-        areaMaterial = new THREE.MeshBasicMaterial({ color: 0x44bd32, opacity: 0.6, transparent: true });
-        const areaMesh = new THREE.Mesh(areaGeo, areaMaterial);
+        areaMaterial = new THREE.MeshPhongMaterial({
+            color: 0x44bd32, opacity: 0.6, transparent: true
+        });
+
+        //const areaMesh;
+
+        switch (world.areaTypes.type) {
+            case "Grass":
+                console.log("grass selected");
+                //const areaMesh = new THREE.Mesh(areaGeo, grassMaterial);
+                break;
+            case "Soil":
+                console.log("soil selected");
+
+                //const areaMesh = new THREE.Mesh(areaGeo, soilMaterial);
+                break;
+            case "Gravel":
+                console.log("gravel selected");
+
+                //const areaMesh = new THREE.Mesh(areaGeo, gravelMaterial);
+                break;
+            case "Stone":
+                console.log("stone selected");
+
+                // const areaMesh = new THREE.Mesh(areaGeo, stoneMaterial);
+                break;
+
+        }
+
+        const areaMesh = new THREE.Mesh(areaGeo, grassMaterial);
         areaMesh.name = "area";
         scene.add(areaMesh);
-        areaMesh.position.y += 2;
+        areaMesh.position.y += 0.1;
     }
 }
 
