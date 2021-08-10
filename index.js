@@ -2,6 +2,7 @@ import * as THREE from "https://unpkg.com/three@0.126.1/build/three.module.js";
 
 import { OrbitControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/OrbitControls.js";
 import { ConvexGeometry } from "https://unpkg.com/three@0.126.1/examples/jsm/geometries/ConvexGeometry.js";
+import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.module.js";
 
 let camera, scene, renderer, controls;
 let planeMesh, planeMaterial;
@@ -19,9 +20,9 @@ const lines = [];
 const outlinePoints = [];
 
 const box = new THREE.Box3();
+const gui = new GUI();
 
 init();
-render();
 
 function init() {
 
@@ -130,12 +131,9 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
 
     renderer.setSize(window.innerWidth, window.innerHeight);
-
 }
 
 function onPointerMove(event) {
-
-
     pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
 
     raycaster.setFromCamera(pointer, camera);
@@ -156,14 +154,13 @@ function onPointerMove(event) {
 
     }
 
-    render();
+    //render();
 }
 
 function onPointerDown(event) {
 
     switch (event.which) {
         case 1: //left click
-
             if (!outlineFinished) {
                 pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                 raycaster.setFromCamera(pointer, camera);
@@ -191,7 +188,6 @@ function onPointerDown(event) {
                             drawLine();
                         }
                     }
-
                 }
             }
             break;
@@ -200,10 +196,6 @@ function onPointerDown(event) {
         case 3: //right mouse
             break;
     }
-
-
-
-    render();
 }
 
 function onDocumentKeyDown(event) {
@@ -213,23 +205,22 @@ function onDocumentKeyDown(event) {
         case 16: isShiftDown = true; break;
         case 82: resetOutline(); break;
     }
-
 }
 
 function onDocumentKeyUp(event) {
 
     switch (event.keyCode) {
-
         case 16: isShiftDown = false; break;
     }
-
 }
 
 function render() {
 
+    requestAnimationFrame(render);
     controls.update();
     renderer.render(scene, camera);
 }
+render();
 
 function drawLine() {
     //console.log("Draw outline");
