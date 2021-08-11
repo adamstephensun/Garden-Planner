@@ -14,7 +14,7 @@ let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
 let rollOverMesh, rollOverMaterial;
 let spherePointerGeo, spherePointerMaterial, nodeID;
 let outlineGeo, outlineMaterial;
-let areaGeo, areaID;
+let areaGeo, areaID, areaHeightOffset;
 let outlineFinished = new Boolean;
 
 
@@ -48,6 +48,7 @@ function init() {
     outlineFinished = false;
     nodeID = 0;
     areaID = 0;
+    areaHeightOffset = 0;
 
     loadTextures();
 
@@ -345,9 +346,9 @@ function onPointerDown(event) {
 function onDocumentKeyDown(event) {
 
     switch (event.keyCode) {
-        case 13: finalOutline(); break;
-        case 16: isShiftDown = true; break;
-        case 82: resetOutline(); break;
+        case 13: finalOutline(); break; //Enter
+        case 16: isShiftDown = true; break; //Shift
+        case 82: resetOutline(); break; //R
     }
 }
 
@@ -376,9 +377,9 @@ function drawLine() {
 }
 
 function finalOutline() {
-    if (outlinePoints.length > 2) {
+    if (outlinePoints.length > 2) { //If it is a triangle or more (>2 points)
         console.log("Final outline");
-        outlinePoints.push(new THREE.Vector3(outlinePoints[0].x, outlinePoints[0].y, outlinePoints[0].z));
+        outlinePoints.push(new THREE.Vector3(outlinePoints[0].x, outlinePoints[0].y, outlinePoints[0].z)); //Add a duplicate of the first point to the end of the array to make it a complete area
         drawLine();
         render();
         outlineFinished = true;
@@ -406,19 +407,27 @@ function finalOutline() {
         areaMesh.name = "area" + areaID;    //Gives the area a name and id
         areaID++;   //increment id
         scene.add(areaMesh);    //Add mesh to the scene
-        areaMesh.position.y -= 0.9; //Makes the area level (just above) the plane
+        areaMesh.position.y -= 0.9 - areaHeightOffset; //Makes the area level (just above) the plane
+        areaHeightOffset += 0.005;  //Height offset is increased slightly each area generated to avoid z fighting
+
+        for(let i in nodes)
+        {
+            console.log("Removed element: " + i.toString());
+            scene.remove(scene.getObjectByName("node "+i));
+        }
     }
+    nodeID = 0; //Reset the node id counter so the next set of nodes can be deleted
+    scene.remove(scene.getObjectByName("outline"));
 }
 
 function resetOutline() {
     for (let i in nodes) {
         scene.remove(nodes[i].object);
-        nodes[i].geometry.dispose();
         console.log("Removed element: " + i.toString());
+        scene.remove(scene.getObjectByName("node "+i));
     }
     nodes.length = 0;
     outlinePoints.length = 0;
-    //outlineGeo.geometry.dispose();
 
     outlineFinished = false;
 }
