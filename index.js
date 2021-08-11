@@ -14,16 +14,15 @@ let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
 let rollOverMesh, rollOverMaterial;
 let spherePointerGeo, spherePointerMaterial, nodeID;
 let outlineGeo, outlineMaterial;
-let areaGeo, areaMaterial;
+let areaGeo, areaID;
 let outlineFinished = new Boolean;
+
 
 const objects = [];
 const nodes = [];
-const lines = [];
 const outlinePoints = [];
 
 const areaTypes = { grass: 'Grass', soil: 'Soil', gravel: 'Gravel', stone: 'Stone' };
-const currentAreaType = areaTypes.GRASS;
 
 const box = new THREE.Box3();
 
@@ -40,7 +39,7 @@ function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xfaedca);
 
-    outlineMaterial = new THREE.LineBasicMaterial({ color: 0x0000ff });
+    outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -48,6 +47,7 @@ function init() {
     document.body.appendChild(renderer.domElement);
     outlineFinished = false;
     nodeID = 0;
+    areaID = 0;
 
     loadTextures();
 
@@ -59,38 +59,47 @@ function init() {
         plane: {
             width: 100,
             height: 100,
-            finalPlane: finalPlane
+            finalPlane: function() {
+                gui.removeFolder(planeFolder);
+                console.log("Plane finalised");
+            }
         },
-        areaTypes: {
-            type: "grass"
+        area: {
+            createNew: function(){
+                resetOutline();
+            },
+            type: "Grass",
+            finishArea: function(){
+                finalOutline();
+            }
         }
     }
 
-    const planeFolder = gui.addFolder("Plane");
-    planeFolder.add(world.plane, "width", 10, 200).
+    const planeFolder = gui.addFolder("Plane");     //Plane folder created
+    planeFolder.add(world.plane, "width", 10, 300). //Add width slider
+        onChange(() => {
+            planeMesh.geometry.dispose();           //Remove old plane geo
+            planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);    //Create new plane geo with slider dimensions
+            planeMesh.geometry.rotateX(- Math.PI / 2);  //Rotate to make flat
+        });
+    planeFolder.add(world.plane, "height", 10, 300).    //Same with height
         onChange(() => {
             planeMesh.geometry.dispose();
             planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
             planeMesh.geometry.rotateX(- Math.PI / 2);
         });
-    planeFolder.add(world.plane, "height", 10, 200).
-        onChange(() => {
-            planeMesh.geometry.dispose();
-            planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
-            planeMesh.geometry.rotateX(- Math.PI / 2);
-        });
-    planeFolder.add(world.plane, "finalPlane").name("Finalise plane");
+    planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
 
-
-    const areaFolder = gui.addFolder("Area");
-    areaFolder.add(world.areaTypes, "type").options(areaTypes).
+    const areaFolder = gui.addFolder("Area");       //Area folder added
+    areaFolder.add(world.area, "type").options(areaTypes).  //Add area type dropdown selector
         onChange(() => {
             console.log(world.areaTypes.type);
         });
+    areaFolder.add(world.area, "createNew").name("New area");
+    areaFolder.add(world.area,"finishArea").name("Finish area");
 
     areaFolder.open();
-    //areaFolder.add()
 
     //#endregion GUI
 
@@ -105,7 +114,7 @@ function init() {
     controls.screenSpacePanning = false;
     controls.minDistance = 100
     controls.maxDistance = 1500;
-    controls.maxPolarAngle = Math.PI / 2.3;
+    //controls.maxPolarAngle = Math.PI / 2.3;
 
     controls.mouseButtons = {
         MIDDLE: THREE.MOUSE.DOLLY,
@@ -358,7 +367,6 @@ function render() {
 render();
 
 function drawLine() {
-    //console.log("Draw outline");
     scene.remove(scene.getObjectByName("outline")); //Deletes the old line object for efficiency
 
     outlineGeo = new THREE.BufferGeometry().setFromPoints(outlinePoints);
@@ -376,49 +384,41 @@ function finalOutline() {
         outlineFinished = true;
 
         areaGeo = new ConvexGeometry(outlinePoints);
-        areaMaterial = new THREE.MeshPhongMaterial({
-            color: 0x44bd32, opacity: 0.6, transparent: true
-        });
 
-        //const areaMesh;
+        let selectedMat;
 
-        switch (world.areaTypes.type) {
+        switch (world.area.type) {     //Switches the material based on mat selected in UI
             case "Grass":
-                console.log("grass selected");
-                //const areaMesh = new THREE.Mesh(areaGeo, grassMaterial);
+                selectedMat = grassMaterial;
                 break;
             case "Soil":
-                console.log("soil selected");
-
-                //const areaMesh = new THREE.Mesh(areaGeo, soilMaterial);
+                selectedMat = soilMaterial;
                 break;
             case "Gravel":
-                console.log("gravel selected");
-
-                //const areaMesh = new THREE.Mesh(areaGeo, gravelMaterial);
+                selectedMat = gravelMaterial;
                 break;
             case "Stone":
-                console.log("stone selected");
-
-                // const areaMesh = new THREE.Mesh(areaGeo, stoneMaterial);
+                selectedMat = stoneMaterial;
                 break;
-
         }
 
-        const areaMesh = new THREE.Mesh(areaGeo, grassMaterial);
-        areaMesh.name = "area";
-        scene.add(areaMesh);
-        areaMesh.position.y += 0.1;
+        const areaMesh = new THREE.Mesh(areaGeo, selectedMat);  //Create the mesh with the selected material
+        areaMesh.name = "area" + areaID;    //Gives the area a name and id
+        areaID++;   //increment id
+        scene.add(areaMesh);    //Add mesh to the scene
+        areaMesh.position.y -= 0.9; //Makes the area level (just above) the plane
     }
 }
 
 function resetOutline() {
     for (let i in nodes) {
         scene.remove(nodes[i].object);
+        nodes[i].geometry.dispose();
         console.log("Removed element: " + i.toString());
     }
     nodes.length = 0;
     outlinePoints.length = 0;
+    //outlineGeo.geometry.dispose();
 
     outlineFinished = false;
 }
