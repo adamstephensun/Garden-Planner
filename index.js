@@ -7,7 +7,7 @@ import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders
 
 //#region declarations
 let camera, scene, renderer, controls, gui, world;
-let planeMesh, gridHelper;
+let planeMesh;
 let pointer, raycaster;
 
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal;
@@ -56,17 +56,13 @@ let currentMouseMode = mouseMode.areaDef;
 
 let currentObject = placableObjects.trees.tree1;
 
-const box = new THREE.Box3();
-
 //#endregion declarations
 
 init();
 
 function init() {
 
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.set(50, 80, 130);
-    camera.lookAt(0, 0, 0);
+    //#region renderer and scene setup
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xfaedca);
@@ -85,6 +81,8 @@ function init() {
 
     loadTextures();
 
+    //#endregion renderer and scene setup
+
     //#region GUI
 
     gui = new GUI();
@@ -100,6 +98,7 @@ function init() {
         },
         area: {
             createNew: function(){
+                currentMouseMode = mouseMode.areaDef;
                 resetOutline();
             },
             type: "Grass",
@@ -109,24 +108,34 @@ function init() {
         },
         objects:{
             place: function(){
-
+                currentMouseMode = mouseMode.objectPlace;
             },
             remove: function(){
-
+                currentMouseMode = mouseMode.objectRemove;
             },
             move: function(){
-
+                currentMouseMode = mouseMode.objectMove;
             },
             trees:{
-                tree1: function()
-                {
-
+                tree1: function(){
+                    currentObject = placableObjects.trees.tree1;
+                },
+                tree2: function(){
+                    currentObject = placableObjects.trees.tree2;
+                },
+                tree3: function(){
+                    currentObject = placableObjects.trees.tree3;
                 }
             },
             furniture:{
-                bench1: function()
-                {
-
+                bench1: function(){
+                    currentObject = placableObjects.benches.bench1;
+                },
+                bench2: function(){
+                    currentObject = placableObjects.benches.bench2;
+                },
+                bench3: function(){
+                    currentObject = placableObjects.benches.bench3;
                 }
             }
         }
@@ -190,6 +199,10 @@ function init() {
     //#endregion GUI
 
     //#region camera controls
+
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+    camera.position.set(50, 80, 130);
+    camera.lookAt(0, 0, 0);
 
     controls = new OrbitControls(camera, renderer.domElement);
 
@@ -401,77 +414,95 @@ function onPointerDown(event) {
         case mouseMode.areaDef:         //Area definition mode
             
             switch (event.which){   ////Mouse button switch 
-                case 1: //Left click
+                case 1: //Left click area definition
+
+                if (!outlineFinished) {
+
+                    pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                    raycaster.setFromCamera(pointer, camera);
+                    const intersects = raycaster.intersectObjects(objects);
+    
+                    if (intersects.length > 0) {    //If ray intersects with something
+    
+                        const intersect = intersects[0];
+                        if (objects.includes(intersect.object)){    //if intersect is included in the objects array
+                            let node;   //temp variable to store the gltf.scene object
+    
+                            new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
+                                node = gltf.scene;      //gltf model assigned to node object
+                                node.castShadow = true;
+                                node.scale.set(13,13,13);       //Increase scale
+                                node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                                scene.add(node);        //Add the node to the scene
+    
+                                node.name = "node " + nodeID;   //Give the node a name with the id
+                                nodeID++;       //increment id 
+                                nodes.push(node);               //Push node to the array of nodes
+                                console.log("Pushed node:" + node.name);
+        
+                                const pos = node.position;     //temp variable to store the point
+                                outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
+                                console.log("Added point at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
+    
+                                if (outlinePoints.length > 1) { //if there is more than one point, draw a line between them
+                                    drawLine();
+                                }
+        
+                                if (outlinePoints.length == 4) {    //Finishes the outline on four points
+                                    finalOutline();
+                                }
+                            });
+                        }
+                    }
+                }
                     break;
-                case 2: //Middle click
+                case 2: //Middle click area definition
                     break;
-                case 3: //right click
+                case 3: //right click area definition
                     break;
             }
             
-            break;
+        break;
         case mouseMode.objectPlace:     //Object placing mode
+
+        switch (event.which){   ////Mouse button switch 
+            case 1: //Left click object place
+
+                break;
+            case 2: //Middle click
+                break;
+            case 3: //right click
+                break;
+        }
+
             break;
         case mouseMode.objectRemove:    //Object removing mode
-            break;
+
+        switch (event.which){   ////Mouse button switch 
+            case 1: //Left click
+                break;
+            case 2: //Middle click
+                break;
+            case 3: //right click
+                break;
+        }
+        break;
         case mouseMode.objectMove:      //Object moving mode
+
+        switch (event.which){   ////Mouse button switch 
+            case 1: //Left click
+                break;
+            case 2: //Middle click
+                break;
+            case 3: //right click
+                break;
+        }
+
             break;
     }
 
     switch (event.which) {
         case 1: //left click
-            switch(currentMouseMode)
-            {
-                case mouseMode.areaDef:
-                    if (!outlineFinished) {
-
-                        pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                        raycaster.setFromCamera(pointer, camera);
-                        const intersects = raycaster.intersectObjects(objects);
-        
-                        if (intersects.length > 0) {    //If ray intersects with something
-        
-                            const intersect = intersects[0];
-                            if (objects.includes(intersect.object));    //if intersect is included in the objects array
-                            {
-                                //const nodeMesh = new THREE.Mesh(spherePointerGeo, spherePointerMaterial);   //Create mesh for solid sphere
-                                //nodeMesh.position.copy(intersect.point).add(intersect.face.normal);         //set mesh to intersect position
-                                //scene.add(nodeMesh);        //Add mesh to scene
-        
-                                let node;   //temp variable to store the gltf.scene object
-        
-                                new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
-                                    node = gltf.scene;      //gltf model assigned to node object
-                                    node.castShadow = true;
-                                    node.scale.set(13,13,13);       //Increase scale
-                                    node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                                    scene.add(node);        //Add the node to the scene
-        
-                                    node.name = "node " + nodeID;   //Give the node a name with the id
-                                    nodeID++;       //increment id 
-                                    nodes.push(node);               //Push node to the array of nodes
-                                    console.log("Pushed node:" + node.name);
-            
-                                    const pos = node.position;     //temp variable to store the point
-                                    outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
-                                    console.log("Added point at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
-        
-                                    if (outlinePoints.length > 1) { //if there is more than one point, draw a line between them
-                                        drawLine();
-                                    }
-            
-                                    if (outlinePoints.length == 4) {    //Finishes the outline on four points
-                                        finalOutline();
-                                    }
-                                });
-                                
-        
-                            }
-                        }
-                    }
-                    break;
-            }
-
             break;
         case 2: //middle mouse
             break;
