@@ -3,26 +3,58 @@ import * as THREE from "https://unpkg.com/three@0.126.1/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/OrbitControls.js";
 import { ConvexGeometry } from "https://unpkg.com/three@0.126.1/examples/jsm/geometries/ConvexGeometry.js";
 import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.module.js";
+import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js";
 
 //#region declarations
 let camera, scene, renderer, controls, gui, world;
-let planeMesh, planeMaterial, gridHelper;
-let pointer, raycaster, isShiftDown = false;
+let planeMesh, gridHelper;
+let pointer, raycaster;
+
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal;
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
 
 let rollOverMesh, rollOverMaterial;
-let spherePointerGeo, spherePointerMaterial, nodeID;
+let nodeID;
 let outlineGeo, outlineMaterial;
 let areaGeo, areaID, areaHeightOffset;
 let outlineFinished = new Boolean;
-
 
 const objects = [];
 const nodes = [];
 const outlinePoints = [];
 
 const areaTypes = { grass: 'Grass', soil: 'Soil', gravel: 'Gravel', stone: 'Stone' };
+
+const placableObjects = {
+    trees:{
+        tree1: "Tree 1",
+        tree2: "Tree 2",
+        tree3: "Tree 3"
+    },
+    bushes:{
+        bush1: "Bush 1",
+        bush2: "Bush 2",
+        bush3: "Bush 3"
+    },
+    furniture:{
+        benches:{
+            bench1: "Bench 1",
+            bench2: "Bench 2",
+            bench3: "Bench 3"
+        }
+    }
+}
+
+const mouseMode = {
+    areaDef: "Area definition",
+    objectPlace: "Object place",
+    objectRemove: "Object remove",
+    objectMove: "Object move"
+}
+
+let currentMouseMode = mouseMode.areaDef;
+
+let currentObject = placableObjects.trees.tree1;
 
 const box = new THREE.Box3();
 
@@ -39,11 +71,12 @@ function init() {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0xfaedca);
 
-    outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
-
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.BasicShadowMap;
+
     document.body.appendChild(renderer.domElement);
     outlineFinished = false;
     nodeID = 0;
@@ -73,6 +106,29 @@ function init() {
             finishArea: function(){
                 finalOutline();
             }
+        },
+        objects:{
+            place: function(){
+
+            },
+            remove: function(){
+
+            },
+            move: function(){
+
+            },
+            trees:{
+                tree1: function()
+                {
+
+                }
+            },
+            furniture:{
+                bench1: function()
+                {
+
+                }
+            }
         }
     }
 
@@ -90,7 +146,7 @@ function init() {
             planeMesh.geometry.rotateX(- Math.PI / 2);
         });
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
-    planeFolder.open();
+    //planeFolder.open();
 
     const areaFolder = gui.addFolder("Area");       //Area folder added
     areaFolder.add(world.area, "type").options(areaTypes).  //Add area type dropdown selector
@@ -99,12 +155,41 @@ function init() {
         });
     areaFolder.add(world.area, "createNew").name("New area");
     areaFolder.add(world.area,"finishArea").name("Finish area");
+    //areaFolder.open();
 
-    areaFolder.open();
+    const objectFolder = gui.addFolder("Objects");
+    objectFolder.add(world.objects, "place").name("Place");
+    objectFolder.add(world.objects, "remove").name("Remove");
+    objectFolder.add(world.objects, "move").name("Move");
+
+    const treeFolder = objectFolder.addFolder("Trees");
+    treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
+
+    const furnitureFolder = objectFolder.addFolder("Furniture");
+    furnitureFolder.add(world.objects.furniture, "bench1").name("Bench 1");
+
+    objectFolder.open();
+
+    let tree;
+
+    const treeMat = new THREE.MeshToonMaterial();
+
+    new GLTFLoader().load('models/tree1.gltf', function(gltf){
+        tree = gltf.scene;
+        tree.traverse(function(child){
+            if(child instanceof THREE.Mesh){
+                //child.material = treeMat;
+            }
+        })
+
+        tree.scale.set(20,20,20);
+        scene.add(tree);
+    });
+    
 
     //#endregion GUI
 
-    //#region controls
+    //#region camera controls
 
     controls = new OrbitControls(camera, renderer.domElement);
 
@@ -115,27 +200,22 @@ function init() {
     controls.screenSpacePanning = false;
     controls.minDistance = 100
     controls.maxDistance = 1500;
-    //controls.maxPolarAngle = Math.PI / 2.3;
+    controls.maxPolarAngle = Math.PI / 2.3;
 
     controls.mouseButtons = {
         MIDDLE: THREE.MOUSE.DOLLY,
         RIGHT: THREE.MOUSE.ROTATE
     }
-    //#endregion controls
+    //#endregion camera controls
 
     //#region spheres
 
     //////roll-over sphere/////
 
-    const rollOverGeo = new THREE.SphereGeometry(4, 32, 32);
+    const rollOverGeo = new THREE.SphereGeometry(1, 32, 32);
     rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
     rollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMaterial);
     scene.add(rollOverMesh);
-
-    /////node sphere/////
-
-    spherePointerGeo = new THREE.SphereGeometry(4, 32, 32);
-    spherePointerMaterial = new THREE.MeshLambertMaterial({ color: 0xe84118 });
 
     //#endregion spheres
 
@@ -148,14 +228,12 @@ function init() {
 
     //#region plane & grid
 
-    //gridHelper = new THREE.GridHelper(world.plane.height, 20, 0x000000, 0x3b3b3b);
-    //gridHelper.position.y += 1;
-    //scene.add(gridHelper);
 
     const planeGeo = new THREE.PlaneGeometry(100, 100);
     planeGeo.rotateX(- Math.PI / 2);
 
     planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
+    planeMesh.recieveShadow = true;
     planeMesh.name = "plane";
     scene.add(planeMesh);
 
@@ -170,7 +248,21 @@ function init() {
 
     const directionalLight = new THREE.DirectionalLight(0xffffff);
     directionalLight.position.set(1, 0.75, 0.5).normalize();
+    directionalLight.castShadow = true;
+
+    directionalLight.shadow.mapSize.width = 512;
+    directionalLight.shadow.mapSize.height = 512;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
+
     scene.add(directionalLight);
+
+    /*const sphereGeometry = new THREE.SphereGeometry( 5, 32, 32 );
+    const sphereMaterial = new THREE.MeshStandardMaterial( { color: 0xfff000 } );
+    const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
+    sphere.castShadow = true; //default is false
+    sphere.receiveShadow = false; //default
+    scene.add( sphere );*/
 
     //#endregion lights
 
@@ -183,7 +275,6 @@ function init() {
     window.addEventListener('resize', onWindowResize);
 
     //#endregion listeners
-
 
 }
 
@@ -263,6 +354,12 @@ function loadTextures() {
         normalMap: stoneNormal,
         side: THREE.DoubleSide
     })
+
+
+    /////Other mats/////
+
+    outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
+
 }
 
 function onWindowResize() {
@@ -299,42 +396,82 @@ function onPointerMove(event) {
 
 function onPointerDown(event) {
 
+    switch(currentMouseMode)    //Master switch for mouse mode
+    {
+        case mouseMode.areaDef:         //Area definition mode
+            
+            switch (event.which){   ////Mouse button switch 
+                case 1: //Left click
+                    break;
+                case 2: //Middle click
+                    break;
+                case 3: //right click
+                    break;
+            }
+            
+            break;
+        case mouseMode.objectPlace:     //Object placing mode
+            break;
+        case mouseMode.objectRemove:    //Object removing mode
+            break;
+        case mouseMode.objectMove:      //Object moving mode
+            break;
+    }
+
     switch (event.which) {
         case 1: //left click
-            if (!outlineFinished) {
+            switch(currentMouseMode)
+            {
+                case mouseMode.areaDef:
+                    if (!outlineFinished) {
 
-                pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                raycaster.setFromCamera(pointer, camera);
-                const intersects = raycaster.intersectObjects(objects);
-
-                if (intersects.length > 0) {    //If ray intersects with something
-
-                    const intersect = intersects[0];
-                    if (objects.includes(intersect.object));    //if intersect is included in the objects array
-                    {
-                        const nodeMesh = new THREE.Mesh(spherePointerGeo, spherePointerMaterial);   //Create mesh for solid sphere
-                        nodeMesh.position.copy(intersect.point).add(intersect.face.normal);         //set mesh to intersect position
-                        scene.add(nodeMesh);        //Add mesh to scene
-
-                        nodeMesh.name = "node " + nodeID;   //Give the node a name 
-                        nodeID++;       //increment id 
-                        nodes.push(nodeMesh);               //Push node to the array of nodes
-                        console.log("Pushed node ID:" + nodeID);
-
-                        const pos = nodeMesh.position;     //temp variable to store the point
-                        outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z));
-                        console.log("Added point at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
-
-                        if (outlinePoints.length > 1) {
-                            drawLine();
-                        }
-
-                        if (outlinePoints.length == 4) {    //Finishes the outline on four points
-                            finalOutline();
+                        pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                        raycaster.setFromCamera(pointer, camera);
+                        const intersects = raycaster.intersectObjects(objects);
+        
+                        if (intersects.length > 0) {    //If ray intersects with something
+        
+                            const intersect = intersects[0];
+                            if (objects.includes(intersect.object));    //if intersect is included in the objects array
+                            {
+                                //const nodeMesh = new THREE.Mesh(spherePointerGeo, spherePointerMaterial);   //Create mesh for solid sphere
+                                //nodeMesh.position.copy(intersect.point).add(intersect.face.normal);         //set mesh to intersect position
+                                //scene.add(nodeMesh);        //Add mesh to scene
+        
+                                let node;   //temp variable to store the gltf.scene object
+        
+                                new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
+                                    node = gltf.scene;      //gltf model assigned to node object
+                                    node.castShadow = true;
+                                    node.scale.set(13,13,13);       //Increase scale
+                                    node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                                    scene.add(node);        //Add the node to the scene
+        
+                                    node.name = "node " + nodeID;   //Give the node a name with the id
+                                    nodeID++;       //increment id 
+                                    nodes.push(node);               //Push node to the array of nodes
+                                    console.log("Pushed node:" + node.name);
+            
+                                    const pos = node.position;     //temp variable to store the point
+                                    outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
+                                    console.log("Added point at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
+        
+                                    if (outlinePoints.length > 1) { //if there is more than one point, draw a line between them
+                                        drawLine();
+                                    }
+            
+                                    if (outlinePoints.length == 4) {    //Finishes the outline on four points
+                                        finalOutline();
+                                    }
+                                });
+                                
+        
+                            }
                         }
                     }
-                }
+                    break;
             }
+
             break;
         case 2: //middle mouse
             break;
