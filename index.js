@@ -14,7 +14,7 @@ let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNor
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
 
 let rollOverMesh, rollOverMaterial;
-let nodeID;
+let nodeID, objectID;
 let outlineGeo, outlineMaterial;
 let areaGeo, areaID, areaHeightOffset;
 let outlineFinished = new Boolean;
@@ -22,30 +22,29 @@ let outlineFinished = new Boolean;
 const objects = [];
 const nodes = [];
 const outlinePoints = [];
+const placedObjects = [];
 
 const areaTypes = { grass: 'Grass', soil: 'Soil', gravel: 'Gravel', stone: 'Stone' };
 
 const placableObjects = {
     trees:{
-        tree1: "Tree 1",
-        tree2: "Tree 2",
-        tree3: "Tree 3"
+        tree1: "Tree 1", tree2: "Tree 2", tree3: "Tree 3"
     },
     bushes:{
-        bush1: "Bush 1",
-        bush2: "Bush 2",
-        bush3: "Bush 3"
+        bush1: "Bush 1", bush2: "Bush 2", bush3: "Bush 3"
     },
     furniture:{
         benches:{
-            bench1: "Bench 1",
-            bench2: "Bench 2",
-            bench3: "Bench 3"
+            bench1: "Bench 1", bench2: "Bench 2", bench3: "Bench 3"
+        },
+        chairs:{
+            chair1: "Chair 1", chair2: "Chair 2", chair3: "Chair 3"
         }
     }
 }
 
 const mouseMode = {
+    default: "Default",
     areaDef: "Area definition",
     objectPlace: "Object place",
     objectRemove: "Object remove",
@@ -78,6 +77,7 @@ function init() {
     outlineFinished = false;
     nodeID = 0;
     areaID = 0;
+    objectID = 0;
     areaHeightOffset = 0;
 
     loadTextures();
@@ -103,11 +103,14 @@ function init() {
             }
         },
         area: {     //Controls for area creation
+            type: "Grass",          //Dropdown for the area type to be created
             createNew: function(){      //Button to create a new area
                 currentMouseMode = mouseMode.areaDef;   //Set the mouse mode to area creation
                 resetOutline();
             },
-            type: "Grass",          //Dropdown for the area type to be created
+            continueArea: function(){
+                currentMouseMode = mouseMode.areaDef;
+            },
             finishArea: function(){
                 finalOutline();
             }
@@ -156,6 +159,7 @@ function init() {
         }
     }
 
+    //#region GUI folders
     const planeFolder = gui.addFolder("Plane");     //Plane folder created
     planeFolder.add(world.plane, "width", 10, 300). //Add width slider
         onChange(() => {
@@ -170,7 +174,7 @@ function init() {
             planeMesh.geometry.rotateX(- Math.PI / 2);
         });
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
-    //planeFolder.open();
+    planeFolder.open();
 
     const areaFolder = gui.addFolder("Area");       //Area folder added
     areaFolder.add(world.area, "type").options(areaTypes).  //Add area type dropdown selector
@@ -178,6 +182,7 @@ function init() {
             console.log(world.areaTypes.type);
         });
     areaFolder.add(world.area, "createNew").name("New area");       //Add new area button
+    areaFolder.add(world.area, "continueArea").name("Continue Area");
     areaFolder.add(world.area,"finishArea").name("Finish area");    //add finish area button
     //areaFolder.open();
 
@@ -192,11 +197,12 @@ function init() {
     const furnitureFolder = objectFolder.addFolder("Furniture");
     furnitureFolder.add(world.objects.furniture, "bench1").name("Bench 1");
 
-    objectFolder.open();
+    //objectFolder.open();
+
+    //#endregion GUI folders
+
 
     let tree;
-
-    const treeMat = new THREE.MeshToonMaterial();
 
     new GLTFLoader().load('models/furniture/bench1.gltf', function(gltf){
         tree = gltf.scene;
@@ -205,9 +211,8 @@ function init() {
                 //child.material = treeMat;
             }
         })
-
         tree.scale.set(20,20,20);
-        scene.add(tree);
+        //scene.add(tree);
     });
     
 
@@ -227,7 +232,7 @@ function init() {
     controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
-    controls.minDistance = 100;      //Min and max zoom distances
+    controls.minDistance = 10;      //Min and max zoom distances
     controls.maxDistance = 1500;
     controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
 
@@ -302,6 +307,7 @@ function init() {
     document.addEventListener('keyup', onDocumentKeyUp);
     window.addEventListener('resize', onWindowResize);
 
+    //gui.document.addEventListener('pointerdown', function() { currentMouseMode = mouseMode.default;}, false);
     //#endregion listeners
 
 }
@@ -431,16 +437,24 @@ function onPointerMove(event) {
         switch(currentMouseMode)    //Switch for mouse modes
         {
             case mouseMode.areaDef:
-                if (!outlineFinished) {
-                    rollOverMesh.visible = true;
-                    rollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
-                    //rollOverMesh.position.divideScalar(50).floor().multiplyScalar(50).addScalar(25);
-                }
-                else {
-                    rollOverMesh.visible = false;
-                }
+                rollOverMesh.visible = true;
+                rollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
                 break;
             case mouseMode.objectPlace:
+                rollOverMesh.visible = false;
+                let hoverObject;
+                new GLTFLoader().load(currentObjectPath, function(gltf){
+                    hoverObject = gltf.scene;
+                    hoverObject.traverse(function(child){
+                        if(child instanceof THREE.Mesh) { child.material = rollOverMaterial; } //Makes the object transparent
+                    });
+                    hoverObject.position.copy(intersect.point).add(intersect.face.normal);
+                    hoverObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
+                    hoverObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
+                    scene.add(hoverObject);
+                    //scene.remove(hoverObject);
+                });
+
                 break;
             case mouseMode.objectRemove:
                 break;
@@ -524,15 +538,15 @@ function onPointerDown(event) {
                         new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads marker post model
                             placableObject = gltf.scene;      //gltf model assigned to node object
                             placableObject.castShadow = true;
-                            placableObject.scale.set(currentScale,currentScale,currentScale);  //Increase scale
                             placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                            placableObject.rotation.y = THREE.Math.degToRad(currentRotation);
+                            placableObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
+                            placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
                             scene.add(placableObject);        //Add the node to the scene
 
-                            placableObject.name = "node " + nodeID;   //Give the node a name with the id
-                            nodeID++;       //increment id 
-                            nodes.push(placableObject);               //Push node to the array of nodes
-                            console.log("Pushed node:" + placableObject.name);
+                            placableObject.name = "object " + objectID;   //Give the node a name with the id
+                            objectID++;       //increment id 
+                            placedObjects.push(placableObject);               //Push node to the array of nodes
+                            console.log("Pushed object:" + placableObject.name);
                         });
                     }
                 }
