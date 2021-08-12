@@ -6,9 +6,10 @@ import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.m
 import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js";
 
 //#region declarations
-let camera, scene, renderer, controls, gui, world;
+let camera, listener, scene, renderer, controls, gui, world;
 let planeMesh;
 let pointer, raycaster;
+let spawnSound, deleteSound;
 
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal;
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
@@ -19,7 +20,6 @@ let nodeID, objectID;
 let outlineGeo, outlineMaterial;
 let areaGeo, areaID, areaHeightOffset;
 let outlineFinished = new Boolean;
-let clock;
 
 const objects = [];
 const nodes = [];
@@ -83,7 +83,6 @@ function init() {
     areaID = 0;
     objectID = 0;
     areaHeightOffset = 0;
-    clock = new THREE.Clock(false);
 
     loadTextures();
 
@@ -93,6 +92,8 @@ function init() {
     currentRotation = 0;
 
     //#endregion renderer and scene setup
+
+
 
     //#region GUI
 
@@ -341,6 +342,28 @@ function init() {
 
     //gui.document.addEventListener('pointerdown', function() { currentMouseMode = mouseMode.default;}, false);
     //#endregion listeners
+
+    //#region audio
+
+    listener = new THREE.AudioListener();
+    camera.add(listener);
+
+    spawnSound = new THREE.Audio(listener);
+    scene.add(spawnSound);
+
+    new THREE.AudioLoader().load('sounds/pop.wav', function (audioBuffer){
+        spawnSound.setBuffer(audioBuffer);
+        //sound.play();
+    });
+
+    deleteSound = new THREE.Audio(listener);
+    scene.add(deleteSound);
+
+    new THREE.AudioLoader().load('sounds/click1.wav', function (audioBuffer){
+        deleteSound.setBuffer(audioBuffer);
+    });
+
+    //#endregion audio
 
 }
 
@@ -595,6 +618,8 @@ function onPointerDown(event) {
                             objectID++;       //increment object id 
                             placedObjects.push(placableObject);               //Push object to the array of nodes
                             console.log("Pushed object:" + placableObject.name);
+
+                            spawnSound.play();
                         });
                     }
                 }
@@ -625,6 +650,7 @@ function onPointerDown(event) {
 
                     const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
                     if(index > -1) placedObjects.splice(index,1);
+                    deleteSound.play();
                 }
                 break;
             case 2: //Middle click
