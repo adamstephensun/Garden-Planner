@@ -199,13 +199,13 @@ function init() {
 
     //#region GUI folders
     const planeFolder = gui.addFolder("Plane");     //Plane folder created
-    planeFolder.add(world.plane, "width", 10, 300). //Add width slider
+    planeFolder.add(world.plane, "width", 10, 300).name("Width"). //Add width slider
         onChange(() => {
             planeMesh.geometry.dispose();           //Remove old plane geo
             planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);    //Create new plane geo with slider dimensions
             planeMesh.geometry.rotateX(- Math.PI / 2);  //Rotate to make flat
         });
-    planeFolder.add(world.plane, "height", 10, 300).    //Same with height
+    planeFolder.add(world.plane, "height", 10, 300).name("Height").    //Same with height
         onChange(() => {
             planeMesh.geometry.dispose();
             planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
@@ -215,7 +215,7 @@ function init() {
     planeFolder.open();
 
     const areaFolder = gui.addFolder("Area");       //Area folder added
-    areaFolder.add(world.area, "type").options(areaTypes).  //Add area type dropdown selector
+    areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type").  //Add area type dropdown selector
         onChange(() => {
             console.log(world.areaTypes.type);
         });
@@ -611,18 +611,21 @@ function onPointerDown(event) {
         switch (event.which){   ////Mouse button switch 
             case 1: //Left click
 
-            pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-            raycaster.setFromCamera(pointer, camera);
+                pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                raycaster.setFromCamera(pointer, camera);
 
-            const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
-                                                                                //true parameter makes it search recursively through the objects children
-            if (intersects.length > 0) {    //If ray intersects with something
+                const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
+                                                                                    //true parameter makes it search recursively through the objects children
+                if (intersects.length > 0) {    //If ray intersects with something
 
-                const intersect = intersects[0];
-                scene.remove(scene.getObjectByName(intersect.object.parent.name));  //Removes the parent of the object 
-                console.log("Removed object: "+intersect.object.parent.name);
-            }
+                    const intersect = intersects[0];
+                    const parentName = intersect.object.parent.name;
+                    scene.remove(scene.getObjectByName(parentName));  //Removes the parent of the object 
+                    console.log("Removed object: "+parentName);
 
+                    const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
+                    if(index > -1) placedObjects.splice(index,1);
+                }
                 break;
             case 2: //Middle click
                 break;
@@ -651,12 +654,7 @@ function onDocumentKeyDown(event) {
         case 13: finalOutline(); break; //Enter
         case 16: isShiftDown = true; break; //Shift
         case 82: resetOutline(); break; //R
-        case 32:    //Space
-            for(let i in placedObjects)
-            {
-                console.log(placedObjects[i]);
-            }
-            break;
+        case 32: console.log(placedObjects); break; //space
 
         case 38:    //Arrow up - scale up
             currentScale += 0.5; 
