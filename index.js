@@ -14,10 +14,12 @@ let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNor
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
 
 let rollOverMesh, rollOverMaterial;
+let objectRolloverMesh, objectRolloverMaterial;
 let nodeID, objectID;
 let outlineGeo, outlineMaterial;
 let areaGeo, areaID, areaHeightOffset;
 let outlineFinished = new Boolean;
+let clock;
 
 const objects = [];
 const nodes = [];
@@ -39,6 +41,9 @@ const placableObjects = {
         },
         chairs:{
             chair1: "Chair 1", chair2: "Chair 2", chair3: "Chair 3"
+        },
+        tables:{
+            table1: "Table 1", table2: "Table 2", table3: "Table 3"
         }
     }
 }
@@ -52,7 +57,6 @@ const mouseMode = {
 }
 
 let currentMouseMode = mouseMode.areaDef;
-
 
 let currentObject, currentObjectPath, currentScale, currentRotation;
 
@@ -79,6 +83,7 @@ function init() {
     areaID = 0;
     objectID = 0;
     areaHeightOffset = 0;
+    clock = new THREE.Clock(false);
 
     loadTextures();
 
@@ -118,42 +123,75 @@ function init() {
         objects:{       //Stores all the placable objects
             place: function(){      //Button to place objects
                 currentMouseMode = mouseMode.objectPlace;   //Changes mouse mode accordingly
-                updateCurrentObjects()
+                updateCurrentObjectPath();
+                //loadRollover();
             },
             remove: function(){     //Button to remove objects
                 currentMouseMode = mouseMode.objectRemove;
-                updateCurrentObjects()
+                console.log("Mouse mode = " + currentMouseMode);
+                //updateCurrentObjectPath();
             },
             move: function(){       //Button to move objects
                 currentMouseMode = mouseMode.objectMove;
-                updateCurrentObjects()
+                updateCurrentObjectPath();
             },
             trees:{     //Stores all the tree variations 
                 tree1: function(){
                     currentObject = placableObjects.trees.tree1;    //Changes the current placeable objecgt accordingly
-                    updateCurrentObjects()
+                    updateCurrentObjectPath();
                 },
                 tree2: function(){
                     currentObject = placableObjects.trees.tree2;
-                    updateCurrentObjects()
+                    updateCurrentObjectPath();
                 },
                 tree3: function(){
                     currentObject = placableObjects.trees.tree3;
-                    updateCurrentObjects()
+                    updateCurrentObjectPath();
+                }
+            },
+            bushes:{
+                bush1: function()
+                {
+                    currentObject = placableObjects.bushes.bush1;
+                    updateCurrentObjectPath();
+                },
+                bush2: function()
+                {
+                    currentObject = placableObjects.bushes.bush2;
+                    updateCurrentObjectPath();
+                },
+                bush3: function()
+                {
+                    currentObject = placableObjects.bushes.bush3;
+                    updateCurrentObjectPath();
                 }
             },
             furniture:{  //Stores all the furniture variations
-                bench1: function(){
-                    currentObject = placableObjects.furniture.benches.bench1;
-                    updateCurrentObjects()
+                benches:{
+                    bench1: function(){
+                        currentObject = placableObjects.furniture.benches.bench1;
+                        updateCurrentObjectPath();
+                    },
+                    bench2: function(){
+                        currentObject = placableObjects.furniture.benches.bench2;
+                        updateCurrentObjectPath();
+                    },
+                    bench3: function(){
+                        currentObject = placableObjects.furniture.benches.bench3;
+                        updateCurrentObjectPath();
+                    }
                 },
-                bench2: function(){
-                    currentObject = placableObjects.furniture.benches.bench2;
-                    updateCurrentObjects()
+                chairs:{
+                    chair1: function(){
+                        currentObject = placableObjects.furniture.chairs.chair1;
+                        updateCurrentObjectPath();
+                    }
                 },
-                bench3: function(){
-                    currentObject = placableObjects.furniture.benches.bench3;
-                    updateCurrentObjects()
+                tables:{
+                    table1: function(){
+                        currentObject = placableObjects.furniture.tables.table1;
+                        updateCurrentObjectPath();
+                    }
                 }
             }
         }
@@ -194,27 +232,19 @@ function init() {
     const treeFolder = objectFolder.addFolder("Trees");         //Add tree folder to the objects folder
     treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
 
+    const bushFolder = objectFolder.addFolder("Bushes");
+    bushFolder.add(world.objects.bushes, "bush1").name("Bush 1");
+    bushFolder.add(world.objects.bushes, "bush2").name("Bush 2");
+    bushFolder.add(world.objects.bushes, "bush3").name("Bush 3");
+
     const furnitureFolder = objectFolder.addFolder("Furniture");
-    furnitureFolder.add(world.objects.furniture, "bench1").name("Bench 1");
+    furnitureFolder.add(world.objects.furniture.benches, "bench1").name("Bench 1");
+    furnitureFolder.add(world.objects.furniture.chairs, "chair1").name("Chair 1");
+    furnitureFolder.add(world.objects.furniture.tables, "table1").name("Table 1");
 
     //objectFolder.open();
 
     //#endregion GUI folders
-
-
-    let tree;
-
-    new GLTFLoader().load('models/furniture/bench1.gltf', function(gltf){
-        tree = gltf.scene;
-        tree.traverse(function(child){
-            if(child instanceof THREE.Mesh){
-                //child.material = treeMat;
-            }
-        })
-        tree.scale.set(20,20,20);
-        //scene.add(tree);
-    });
-    
 
     //#endregion GUI
 
@@ -242,7 +272,7 @@ function init() {
     }
     //#endregion camera controls
 
-    //#region spheres
+    //#region Rollovers
 
     //////roll-over sphere/////
 
@@ -251,7 +281,9 @@ function init() {
     rollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMaterial);
     scene.add(rollOverMesh);
 
-    //#endregion spheres
+    objectRolloverMaterial = new THREE.MeshBasicMaterial({opacity: 0.5, transparent: true});
+
+    //#endregion Rollovers
 
     //#region raycast
 
@@ -279,7 +311,7 @@ function init() {
     const ambientLight = new THREE.AmbientLight(0x606060);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
     directionalLight.position.set(1, 0.75, 0.5).normalize();
     directionalLight.castShadow = true;
 
@@ -312,9 +344,10 @@ function init() {
 
 }
 
-function updateCurrentObjects(){
+function updateCurrentObjectPath(){
     switch(currentObject)
     {
+        /////Trees/////
         case placableObjects.trees.tree1:
             currentObjectPath = 'models/trees/tree1.gltf';
             break;
@@ -324,12 +357,31 @@ function updateCurrentObjects(){
         case placableObjects.trees.tree3:
             currentObjectPath = 'models/trees/tree3.gltf';
             break;
+        /////Bushes/////
+        case placableObjects.bushes.bush1:
+            currentObjectPath = 'models/bushes/bush1.gltf';
+            break;
+        case placableObjects.bushes.bush2:
+            currentObjectPath = 'models/bushes/bush2.gltf';
+            break;
+        case placableObjects.bushes.bush3:
+            currentObjectPath = 'models/bushes/bush3.gltf';
+            break;
+        /////furniture/////
         case placableObjects.furniture.benches.bench1:
             currentObjectPath = 'models/furniture/bench1.gltf';
+            break;
+        case placableObjects.furniture.chairs.chair1:
+            currentObjectPath = 'models/furniture/chair1.gltf';
+            break;
+        case placableObjects.furniture.tables.table1:
+            currentObjectPath = 'models/furniture/table1.gltf';
+            break;
     }
 
     currentMouseMode = mouseMode.objectPlace;
     console.log("Current object updated to: " + currentObject);
+    loadRollover();
 }
 
 function loadTextures() {
@@ -442,23 +494,19 @@ function onPointerMove(event) {
                 break;
             case mouseMode.objectPlace:
                 rollOverMesh.visible = false;
-                let hoverObject;
-                new GLTFLoader().load(currentObjectPath, function(gltf){
-                    hoverObject = gltf.scene;
-                    hoverObject.traverse(function(child){
-                        if(child instanceof THREE.Mesh) { child.material = rollOverMaterial; } //Makes the object transparent
-                    });
-                    hoverObject.position.copy(intersect.point).add(intersect.face.normal);
-                    hoverObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
-                    hoverObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
-                    scene.add(hoverObject);
-                    //scene.remove(hoverObject);
-                });
+                objectRolloverMesh.visible = true;
 
+                objectRolloverMesh.position.copy(intersect.point).add(intersect.face.normal);
+                objectRolloverMesh.scale.set(currentScale,currentScale,currentScale);  //Set scale
+                objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
+                
                 break;
             case mouseMode.objectRemove:
+                objectRolloverMesh.visible = false;
                 break;
             case mouseMode.objectMove:
+                objectRolloverMesh.visible = false;
+
                 break;
         }
     }
@@ -541,11 +589,11 @@ function onPointerDown(event) {
                             placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
                             placableObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
                             placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
-                            scene.add(placableObject);        //Add the node to the scene
+                            scene.add(placableObject);        //Add the object to the scene
 
-                            placableObject.name = "object " + objectID;   //Give the node a name with the id
-                            objectID++;       //increment id 
-                            placedObjects.push(placableObject);               //Push node to the array of nodes
+                            placableObject.name = "object " + objectID;   //Give the object a name with the id
+                            objectID++;       //increment object id 
+                            placedObjects.push(placableObject);               //Push object to the array of nodes
                             console.log("Pushed object:" + placableObject.name);
                         });
                     }
@@ -562,6 +610,20 @@ function onPointerDown(event) {
 
         switch (event.which){   ////Mouse button switch 
             case 1: //Left click
+
+            pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(placedObjects); //objects[] contains the plane
+
+            if (intersects.length > 0) {    //If ray intersects with something
+
+                const intersect = intersects[0];
+                if (placedObjects.includes(intersect.object)){    //if intersect is included in the objects array
+                    
+                    console.log("Object clicked: "+intersect.object.name);
+                }
+            }
+
                 break;
             case 2: //Middle click
                 break;
@@ -582,15 +644,6 @@ function onPointerDown(event) {
 
             break;
     }
-
-    switch (event.which) {
-        case 1: //left click
-            break;
-        case 2: //middle mouse
-            break;
-        case 3: //right mouse
-            break;
-    }
 }
 
 function onDocumentKeyDown(event) {
@@ -606,6 +659,7 @@ function onDocumentKeyDown(event) {
             break; 
         case 40:    //Arrow down - scale down
             currentScale -= 0.5; 
+            if(currentScale < 0 ) currentScale = 0.5;
             console.log("Scale changed to: " + currentScale);
             break; 
         case 37:  //Arrow left - -rotation
@@ -620,6 +674,9 @@ function onDocumentKeyDown(event) {
 
             break; 
     }
+
+    objectRolloverMesh.scale.set(currentScale,currentScale,currentScale);  //Set scale
+    objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
 }
 
 function onDocumentKeyUp(event) {
@@ -700,4 +757,15 @@ function resetOutline() {       //Clears nodes and outline points ready for a ne
     outlinePoints.length = 0;
 
     outlineFinished = false;
+}
+
+function loadRollover()
+{
+    new GLTFLoader().load(currentObjectPath, function(gltf){
+        objectRolloverMesh = gltf.scene;
+        objectRolloverMesh.traverse(function(child){
+            if(child instanceof THREE.Mesh) { child.material = objectRolloverMaterial; } //Makes the object transparent
+        });
+        scene.add(objectRolloverMesh);
+    });
 }
