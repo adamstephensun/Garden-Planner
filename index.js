@@ -55,6 +55,9 @@ const mouseMode = {
 let currentMouseMode = mouseMode.areaDef;
 
 let currentObject = placableObjects.trees.tree1;
+let currentObjectPath;
+let currentScale = 10;
+let currentRotation = 0;
 
 //#endregion declarations
 
@@ -85,57 +88,66 @@ function init() {
 
     //#region GUI
 
-    gui = new GUI();
+    gui = new GUI();    //create the gui
 
     world = {
-        plane: {
-            width: 100,
-            height: 100,
-            finalPlane: function() {
+        plane: {            //Controls for the plane
+            width: 100,     //change width
+            height: 100,    //change height
+            finalPlane: function() {    //Finalise the plane. Removes the folder so plane can't be changed again
                 gui.removeFolder(planeFolder);
                 console.log("Plane finalised");
             }
         },
-        area: {
-            createNew: function(){
-                currentMouseMode = mouseMode.areaDef;
+        area: {     //Controls for area creation
+            createNew: function(){      //Button to create a new area
+                currentMouseMode = mouseMode.areaDef;   //Set the mouse mode to area creation
                 resetOutline();
             },
-            type: "Grass",
+            type: "Grass",          //Dropdown for the area type to be created
             finishArea: function(){
                 finalOutline();
             }
         },
-        objects:{
-            place: function(){
-                currentMouseMode = mouseMode.objectPlace;
+        objects:{       //Stores all the placable objects
+            place: function(){      //Button to place objects
+                currentMouseMode = mouseMode.objectPlace;   //Changes mouse mode accordingly
+                updateCurrentObjects()
             },
-            remove: function(){
+            remove: function(){     //Button to remove objects
                 currentMouseMode = mouseMode.objectRemove;
+                updateCurrentObjects()
             },
-            move: function(){
+            move: function(){       //Button to move objects
                 currentMouseMode = mouseMode.objectMove;
+                updateCurrentObjects()
             },
-            trees:{
+            trees:{     //Stores all the tree variations 
                 tree1: function(){
-                    currentObject = placableObjects.trees.tree1;
+                    currentObject = placableObjects.trees.tree1;    //Changes the current placeable objecgt accordingly
+                    updateCurrentObjects()
                 },
                 tree2: function(){
                     currentObject = placableObjects.trees.tree2;
+                    updateCurrentObjects()
                 },
                 tree3: function(){
                     currentObject = placableObjects.trees.tree3;
+                    updateCurrentObjects()
                 }
             },
-            furniture:{
+            furniture:{  //Stores all the furniture variations
                 bench1: function(){
-                    currentObject = placableObjects.benches.bench1;
+                    currentObject = placableObjects.furniture.benches.bench1;
+                    updateCurrentObjects()
                 },
                 bench2: function(){
-                    currentObject = placableObjects.benches.bench2;
+                    currentObject = placableObjects.furniture.benches.bench2;
+                    updateCurrentObjects()
                 },
                 bench3: function(){
-                    currentObject = placableObjects.benches.bench3;
+                    currentObject = placableObjects.furniture.benches.bench3;
+                    updateCurrentObjects()
                 }
             }
         }
@@ -162,16 +174,16 @@ function init() {
         onChange(() => {
             console.log(world.areaTypes.type);
         });
-    areaFolder.add(world.area, "createNew").name("New area");
-    areaFolder.add(world.area,"finishArea").name("Finish area");
+    areaFolder.add(world.area, "createNew").name("New area");       //Add new area button
+    areaFolder.add(world.area,"finishArea").name("Finish area");    //add finish area button
     //areaFolder.open();
 
-    const objectFolder = gui.addFolder("Objects");
-    objectFolder.add(world.objects, "place").name("Place");
+    const objectFolder = gui.addFolder("Objects");              //Add the objects folder
+    objectFolder.add(world.objects, "place").name("Place");     //Add place, remove, move buttons
     objectFolder.add(world.objects, "remove").name("Remove");
     objectFolder.add(world.objects, "move").name("Move");
 
-    const treeFolder = objectFolder.addFolder("Trees");
+    const treeFolder = objectFolder.addFolder("Trees");         //Add tree folder to the objects folder
     treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
 
     const furnitureFolder = objectFolder.addFolder("Furniture");
@@ -183,7 +195,7 @@ function init() {
 
     const treeMat = new THREE.MeshToonMaterial();
 
-    new GLTFLoader().load('models/tree1.gltf', function(gltf){
+    new GLTFLoader().load('models/furniture/bench1.gltf', function(gltf){
         tree = gltf.scene;
         tree.traverse(function(child){
             if(child instanceof THREE.Mesh){
@@ -200,23 +212,23 @@ function init() {
 
     //#region camera controls
 
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.set(50, 80, 130);
-    camera.lookAt(0, 0, 0);
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000); //Create the main camera
+    camera.position.set(50, 80, 130);   //Set the initial position
+    camera.lookAt(0, 0, 0);             //Make the camera look at the origin (position of the plane)
 
-    controls = new OrbitControls(camera, renderer.domElement);
+    controls = new OrbitControls(camera, renderer.domElement);  //Create the camera orbit controls
 
     controls.listenToKeyEvents(window); // optional
 
     controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
-    controls.minDistance = 100
+    controls.minDistance = 100;      //Min and max zoom distances
     controls.maxDistance = 1500;
-    controls.maxPolarAngle = Math.PI / 2.3;
+    controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
 
     controls.mouseButtons = {
-        MIDDLE: THREE.MOUSE.DOLLY,
+        MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
         RIGHT: THREE.MOUSE.ROTATE
     }
     //#endregion camera controls
@@ -240,7 +252,6 @@ function init() {
     //#endregion raycast
 
     //#region plane & grid
-
 
     const planeGeo = new THREE.PlaneGeometry(100, 100);
     planeGeo.rotateX(- Math.PI / 2);
@@ -289,6 +300,26 @@ function init() {
 
     //#endregion listeners
 
+}
+
+function updateCurrentObjects(){
+    switch(currentObject)
+    {
+        case placableObjects.trees.tree1:
+            currentObjectPath = 'models/trees/tree1.gltf';
+            break;
+        case placableObjects.trees.tree2:
+            currentObjectPath = 'models/trees/tree2.gltf';
+            break;
+        case placableObjects.trees.tree3:
+            currentObjectPath = 'models/trees/tree3.gltf';
+            break;
+        case placableObjects.furniture.benches.bench1:
+            currentObjectPath = 'models/furniture/bench1.gltf';
+    }
+
+    currentMouseMode = mouseMode.objectPlace;
+    console.log("Current object updated to: " + currentObject);
 }
 
 function loadTextures() {
@@ -384,27 +415,35 @@ function onWindowResize() {
 }
 
 function onPointerMove(event) {
+
     pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-
     raycaster.setFromCamera(pointer, camera);
-
-    const intersects = raycaster.intersectObjects(objects);
+    const intersects = raycaster.intersectObjects(objects); //objects[] contains the plane
 
     if (intersects.length > 0) {
 
-        const intersect = intersects[0];
-        if (!outlineFinished) {
-            rollOverMesh.visible = true;
-            rollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
-            //rollOverMesh.position.divideScalar(50).floor().multiplyScalar(50).addScalar(25);
-        }
-        else {
-            rollOverMesh.visible = false;
-        }
+        const intersect = intersects[0];    //intersects[] contains the intersection data
 
+        switch(currentMouseMode)    //Switch for mouse modes
+        {
+            case mouseMode.areaDef:
+                if (!outlineFinished) {
+                    rollOverMesh.visible = true;
+                    rollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
+                    //rollOverMesh.position.divideScalar(50).floor().multiplyScalar(50).addScalar(25);
+                }
+                else {
+                    rollOverMesh.visible = false;
+                }
+                break;
+            case mouseMode.objectPlace:
+                break;
+            case mouseMode.objectRemove:
+                break;
+            case mouseMode.objectMove:
+                break;
+        }
     }
-
-    //render();
 }
 
 function onPointerDown(event) {
@@ -468,6 +507,30 @@ function onPointerDown(event) {
         switch (event.which){   ////Mouse button switch 
             case 1: //Left click object place
 
+                pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                raycaster.setFromCamera(pointer, camera);
+                const intersects = raycaster.intersectObjects(objects); //objects[] contains the plane
+
+                if (intersects.length > 0) {    //If ray intersects with something
+
+                    const intersect = intersects[0];
+                    if (objects.includes(intersect.object)){    //if intersect is included in the objects array
+                        let node;   //temp variable to store the gltf.scene object
+
+                        new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads marker post model
+                            node = gltf.scene;      //gltf model assigned to node object
+                            node.castShadow = true;
+                            node.scale.set(13,13,13);       //Increase scale
+                            node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                            scene.add(node);        //Add the node to the scene
+
+                            node.name = "node " + nodeID;   //Give the node a name with the id
+                            nodeID++;       //increment id 
+                            nodes.push(node);               //Push node to the array of nodes
+                            console.log("Pushed node:" + node.name);
+                        });
+                    }
+                }
                 break;
             case 2: //Middle click
                 break;
@@ -523,7 +586,7 @@ function onDocumentKeyDown(event) {
 function onDocumentKeyUp(event) {
 
     switch (event.keyCode) {
-        case 16: isShiftDown = false; break;
+        case 16: isShiftDown = false; break;    //shift
     }
 }
 
@@ -588,7 +651,7 @@ function finalOutline() {
     scene.remove(scene.getObjectByName("outline"));
 }
 
-function resetOutline() {
+function resetOutline() {       //Clears nodes and outline points ready for a new area
     for (let i in nodes) {
         scene.remove(nodes[i].object);
         console.log("Removed element: " + i.toString());
