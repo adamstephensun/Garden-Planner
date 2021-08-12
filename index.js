@@ -54,10 +54,8 @@ const mouseMode = {
 
 let currentMouseMode = mouseMode.areaDef;
 
-let currentObject = placableObjects.trees.tree1;
-let currentObjectPath;
-let currentScale = 10;
-let currentRotation = 0;
+
+let currentObject, currentObjectPath, currentScale, currentRotation;
 
 //#endregion declarations
 
@@ -83,6 +81,11 @@ function init() {
     areaHeightOffset = 0;
 
     loadTextures();
+
+    currentObject = placableObjects.trees.tree1;
+    currentObjectPath;
+    currentScale = 10;
+    currentRotation = 0;
 
     //#endregion renderer and scene setup
 
@@ -220,6 +223,7 @@ function init() {
 
     controls.listenToKeyEvents(window); // optional
 
+    controls.keyPanSpeed = 0;       //Disables key panning but allows panning with middle mouse
     controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
     controls.dampingFactor = 0.05;
     controls.screenSpacePanning = false;
@@ -515,19 +519,20 @@ function onPointerDown(event) {
 
                     const intersect = intersects[0];
                     if (objects.includes(intersect.object)){    //if intersect is included in the objects array
-                        let node;   //temp variable to store the gltf.scene object
+                        let placableObject;   //temp variable to store the gltf.scene object
 
                         new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads marker post model
-                            node = gltf.scene;      //gltf model assigned to node object
-                            node.castShadow = true;
-                            node.scale.set(13,13,13);       //Increase scale
-                            node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                            scene.add(node);        //Add the node to the scene
+                            placableObject = gltf.scene;      //gltf model assigned to node object
+                            placableObject.castShadow = true;
+                            placableObject.scale.set(currentScale,currentScale,currentScale);  //Increase scale
+                            placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                            placableObject.rotation.y = THREE.Math.degToRad(currentRotation);
+                            scene.add(placableObject);        //Add the node to the scene
 
-                            node.name = "node " + nodeID;   //Give the node a name with the id
+                            placableObject.name = "node " + nodeID;   //Give the node a name with the id
                             nodeID++;       //increment id 
-                            nodes.push(node);               //Push node to the array of nodes
-                            console.log("Pushed node:" + node.name);
+                            nodes.push(placableObject);               //Push node to the array of nodes
+                            console.log("Pushed node:" + placableObject.name);
                         });
                     }
                 }
@@ -580,6 +585,26 @@ function onDocumentKeyDown(event) {
         case 13: finalOutline(); break; //Enter
         case 16: isShiftDown = true; break; //Shift
         case 82: resetOutline(); break; //R
+
+        case 38:    //Arrow up - scale up
+            currentScale += 0.5; 
+            console.log("Scale changed to: " + currentScale);
+            break; 
+        case 40:    //Arrow down - scale down
+            currentScale -= 0.5; 
+            console.log("Scale changed to: " + currentScale);
+            break; 
+        case 37:  //Arrow left - -rotation
+            currentRotation -= 5;
+            if(currentRotation <0 ) currentRotation = 360;  //Loops rotation 
+            console.log("Rotation changed to: " + currentRotation);
+            break; 
+        case 39:  //Arrow right - +rotation
+            currentRotation += 5;
+            if(currentRotation > 360 ) currentRotation = 0;
+            console.log("Rotation changed to: " + currentRotation);
+
+            break; 
     }
 }
 
