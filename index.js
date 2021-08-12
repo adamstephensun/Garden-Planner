@@ -613,15 +613,14 @@ function onPointerDown(event) {
 
             pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
             raycaster.setFromCamera(pointer, camera);
-            const intersects = raycaster.intersectObjects(placedObjects); //objects[] contains the plane
 
+            const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
+                                                                                //true parameter makes it search recursively through the objects children
             if (intersects.length > 0) {    //If ray intersects with something
 
                 const intersect = intersects[0];
-                if (placedObjects.includes(intersect.object)){    //if intersect is included in the objects array
-                    
-                    console.log("Object clicked: "+intersect.object.name);
-                }
+                scene.remove(scene.getObjectByName(intersect.object.parent.name));  //Removes the parent of the object 
+                console.log("Removed object: "+intersect.object.parent.name);
             }
 
                 break;
@@ -652,6 +651,12 @@ function onDocumentKeyDown(event) {
         case 13: finalOutline(); break; //Enter
         case 16: isShiftDown = true; break; //Shift
         case 82: resetOutline(); break; //R
+        case 32:    //Space
+            for(let i in placedObjects)
+            {
+                console.log(placedObjects[i]);
+            }
+            break;
 
         case 38:    //Arrow up - scale up
             currentScale += 0.5; 
