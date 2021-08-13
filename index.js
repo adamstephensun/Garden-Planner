@@ -9,7 +9,7 @@ import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders
 let camera, listener, scene, renderer, controls, gui, world;
 let planeMesh;
 let pointer, raycaster;
-let spawnSound, deleteSound;
+let markerSound, spawnSound, deleteSound;
 
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal;
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
@@ -23,6 +23,7 @@ let outlineFinished = new Boolean;
 
 const objects = [];
 const nodes = [];
+const areas = [];
 const outlinePoints = [];
 const placedObjects = [];
 
@@ -31,6 +32,9 @@ const areaTypes = { grass: 'Grass', soil: 'Soil', gravel: 'Gravel', stone: 'Ston
 const placableObjects = {
     trees:{
         tree1: "Tree 1", tree2: "Tree 2", tree3: "Tree 3"
+    },
+    flowers:{
+        pot: "Pot", redFlower: "Red flower", whiteFlower: "White flower", sunflower: "Sunflower"
     },
     bushes:{
         bush1: "Bush 1", bush2: "Bush 2", bush3: "Bush 3"
@@ -49,7 +53,7 @@ const placableObjects = {
 }
 
 const mouseMode = {
-    default: "Default",
+    none: "None",
     areaDef: "Area definition",
     objectPlace: "Object place",
     objectRemove: "Object remove",
@@ -78,22 +82,10 @@ function init() {
     renderer.shadowMap.type = THREE.BasicShadowMap;
 
     document.body.appendChild(renderer.domElement);
-    outlineFinished = false;
-    nodeID = 0;
-    areaID = 0;
-    objectID = 0;
-    areaHeightOffset = 0;
 
     loadTextures();
 
-    currentObject = placableObjects.trees.tree1;
-    currentObjectPath;
-    currentScale = 10;
-    currentRotation = 0;
-
     //#endregion renderer and scene setup
-
-
 
     //#region GUI
 
@@ -111,11 +103,11 @@ function init() {
         area: {     //Controls for area creation
             type: "Grass",          //Dropdown for the area type to be created
             createNew: function(){      //Button to create a new area
-                currentMouseMode = mouseMode.areaDef;   //Set the mouse mode to area creation
+                changeMouseMode(mouseMode.areaDef);   //Set the mouse mode to area creation
                 resetOutline();
             },
             continueArea: function(){
-                currentMouseMode = mouseMode.areaDef;
+                changeMouseMode(mouseMode.areaDef);
             },
             finishArea: function(){
                 finalOutline();
@@ -123,18 +115,13 @@ function init() {
         },
         objects:{       //Stores all the placable objects
             place: function(){      //Button to place objects
-                currentMouseMode = mouseMode.objectPlace;   //Changes mouse mode accordingly
-                updateCurrentObjectPath();
-                //loadRollover();
+                changeMouseMode(mouseMode.objectPlace);   //Changes mouse mode accordingly
             },
             remove: function(){     //Button to remove objects
-                currentMouseMode = mouseMode.objectRemove;
-                console.log("Mouse mode = " + currentMouseMode);
-                //updateCurrentObjectPath();
+                changeMouseMode(mouseMode.objectRemove);
             },
             move: function(){       //Button to move objects
-                currentMouseMode = mouseMode.objectMove;
-                updateCurrentObjectPath();
+                changeMouseMode(mouseMode.objectMove);
             },
             trees:{     //Stores all the tree variations 
                 tree1: function(){
@@ -147,6 +134,24 @@ function init() {
                 },
                 tree3: function(){
                     currentObject = placableObjects.trees.tree3;
+                    updateCurrentObjectPath();
+                }
+            },
+            flowers:{
+                pot: function(){
+                    currentObject = placableObjects.flowers.pot;
+                    updateCurrentObjectPath();
+                },
+                redFlower: function(){
+                    currentObject = placableObjects.flowers.redFlower;
+                    updateCurrentObjectPath();
+                },
+                whiteFlower: function(){
+                    currentObject = placableObjects.flowers.whiteFlower;
+                    updateCurrentObjectPath();
+                },
+                sunflower: function(){
+                    currentObject = placableObjects.flowers.sunflower;
                     updateCurrentObjectPath();
                 }
             },
@@ -232,6 +237,12 @@ function init() {
 
     const treeFolder = objectFolder.addFolder("Trees");         //Add tree folder to the objects folder
     treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
+
+    const flowerFolder = objectFolder.addFolder("Flowers");
+    flowerFolder.add(world.objects.flowers, "pot").name("Flower pot");
+    flowerFolder.add(world.objects.flowers, "redFlower").name("Red flower");
+    flowerFolder.add(world.objects.flowers, "whiteFlower").name("White flower");
+    flowerFolder.add(world.objects.flowers, "sunflower").name("Sunflower");
 
     const bushFolder = objectFolder.addFolder("Bushes");
     bushFolder.add(world.objects.bushes, "bush1").name("Bush 1");
@@ -343,29 +354,23 @@ function init() {
     //gui.document.addEventListener('pointerdown', function() { currentMouseMode = mouseMode.default;}, false);
     //#endregion listeners
 
-    //#region audio
+    //#region assignments and loaders
 
-    listener = new THREE.AudioListener();
-    camera.add(listener);
+    outlineFinished = false;
+    nodeID = 0;
+    areaID = 0;
+    objectID = 0;
+    areaHeightOffset = 0;
 
-    spawnSound = new THREE.Audio(listener);
-    scene.add(spawnSound);
+    currentObject = placableObjects.trees.tree1;
+    currentObjectPath;
+    currentScale = 10;
+    currentRotation = 0;
+    
+    loadAudio();
+ 
 
-    new THREE.AudioLoader().load('sounds/pop.wav', function (audioBuffer){
-        spawnSound.setBuffer(audioBuffer);
-        //sound.play();
-    });
-
-    deleteSound = new THREE.Audio(listener);
-    scene.add(deleteSound);
-
-    new THREE.AudioLoader().load('sounds/click1.wav', function (audioBuffer){
-        deleteSound.setBuffer(audioBuffer);
-    });
-
-    //#endregion audio
-
-}
+    //#endregion assignments and loaders
 
 function updateCurrentObjectPath(){
     switch(currentObject)
@@ -379,6 +384,19 @@ function updateCurrentObjectPath(){
             break;
         case placableObjects.trees.tree3:
             currentObjectPath = 'models/trees/tree3.gltf';
+            break;
+        /////Flowers/////
+        case placableObjects.flowers.pot:
+            currentObjectPath = 'models/flowers/empty pot.gltf';
+            break;
+        case placableObjects.flowers.whiteFlower:
+            currentObjectPath = 'models/flowers/whiteFlower.gltf';
+            break;
+        case placableObjects.flowers.redFlower:
+            currentObjectPath = 'models/flowers/redFlower.gltf';
+            break;
+        case placableObjects.flowers.sunflower:
+            currentObjectPath = 'models/flowers/sunflower.gltf';
             break;
         /////Bushes/////
         case placableObjects.bushes.bush1:
@@ -402,9 +420,29 @@ function updateCurrentObjectPath(){
             break;
     }
 
-    currentMouseMode = mouseMode.objectPlace;
+    changeMouseMode(mouseMode.objectPlace);
     console.log("Current object updated to: " + currentObject);
     loadRollover();
+}
+
+function loadAudio(){
+    listener = new THREE.AudioListener();
+    camera.add(listener);
+
+    spawnSound = new THREE.Audio(listener);
+    scene.add(spawnSound);
+
+    new THREE.AudioLoader().load('sounds/pop.wav', function (audioBuffer){
+        spawnSound.setBuffer(audioBuffer);
+        //sound.play();
+    });
+
+    deleteSound = new THREE.Audio(listener);
+    scene.add(deleteSound);
+
+    new THREE.AudioLoader().load('sounds/click1.wav', function (audioBuffer){
+        deleteSound.setBuffer(audioBuffer);
+    });
 }
 
 function loadTextures() {
@@ -663,6 +701,24 @@ function onPointerDown(event) {
 
         switch (event.which){   ////Mouse button switch 
             case 1: //Left click
+
+                pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                raycaster.setFromCamera(pointer, camera);
+
+                const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
+                                                                                    //true parameter makes it search recursively through the objects children
+                if (intersects.length > 0) {    //If ray intersects with something
+
+                    const intersect = intersects[0];
+                    const parentName = intersect.object.parent.name;
+                    scene.remove(scene.getObjectByName(parentName));  //Removes the parent of the object 
+                    console.log("Removed object: "+parentName);
+
+                    const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
+                    if(index > -1) placedObjects.splice(index,1);
+                    deleteSound.play();
+                }
+
                 break;
             case 2: //Middle click
                 break;
@@ -737,7 +793,6 @@ function finalOutline() {
         console.log("Final outline");
         outlinePoints.push(new THREE.Vector3(outlinePoints[0].x, outlinePoints[0].y, outlinePoints[0].z)); //Add a duplicate of the first point to the end of the array to make it a complete area
         drawLine();
-        render();
         outlineFinished = true;
 
         areaGeo = new ConvexGeometry(outlinePoints);
@@ -762,9 +817,14 @@ function finalOutline() {
         const areaMesh = new THREE.Mesh(areaGeo, selectedMat);  //Create the mesh with the selected material
         areaMesh.name = "area" + areaID;    //Gives the area a name and id
         areaID++;   //increment id
+        areas.push(areaMesh);
         scene.add(areaMesh);    //Add mesh to the scene
         areaMesh.position.y -= 0.9 - areaHeightOffset; //Makes the area level (just above) the plane
         areaHeightOffset += 0.005;  //Height offset is increased slightly each area generated to avoid z fighting
+
+        console.log(areas);
+
+        changeMouseMode(mouseMode.none);
 
         for(let i in nodes)
         {
@@ -798,3 +858,30 @@ function loadRollover()
         scene.add(objectRolloverMesh);
     });
 }
+
+function changeMouseMode(mode)
+{
+    switch(mode)
+    {
+        case mouseMode.none:
+            currentMouseMode = mouseMode.none;
+            rollOverMesh.visible = false;
+            break;
+        case mouseMode.areaDef:
+            currentMouseMode = mouseMode.areaDef;
+            rollOverMesh.visible = true;
+            break;
+        case mouseMode.objectPlace:
+            currentMouseMode = mouseMode.objectPlace;
+            rollOverMesh.visible = false;
+            break;
+        case mouseMode.objectRemove:
+            currentMouseMode = mouseMode.objectRemove;
+            rollOverMesh.visible = false;
+            break;
+        case mouseMode.objectMove:
+            currentMouseMode = mouseMode.objectMove;
+            rollOverMesh.visible = false;
+            break;
+    }
+}}
