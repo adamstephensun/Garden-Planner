@@ -95,6 +95,7 @@ function init() {
         plane: {            //Controls for the plane
             width: 100,     //change width
             height: 100,    //change height
+            type: "Grass",
             finalPlane: function() {    //Finalise the plane. Removes the folder so plane can't be changed again
                 gui.removeFolder(planeFolder);
                 console.log("Plane finalised");
@@ -111,6 +112,9 @@ function init() {
             },
             finishArea: function(){
                 finalOutline();
+            },
+            clearAreas: function(){
+                clearAreas();
             }
         },
         objects:{       //Stores all the placable objects
@@ -217,26 +221,63 @@ function init() {
             planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
             planeMesh.geometry.rotateX(- Math.PI / 2);
         });
+    planeFolder.add(world.plane, "type").options(areaTypes).name("Terrain type").   //Terrain type selector
+    onChange(()=>{
+        objects.length = 0; //Clears the objects array
+        //console.log(objects);
+        scene.remove(planeMesh);    //deletes the old mesh
+
+        switch(world.plane.type)    //generates a new mesh with the selected material
+        {
+            case areaTypes.grass:
+                planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
+                planeMesh.recieveShadow = true;
+                planeMesh.name = "plane";
+                scene.add(planeMesh);
+                objects.push(planeMesh);
+                break;
+            case areaTypes.soil:
+                planeMesh = new THREE.Mesh(planeGeo, soilMaterial);
+                planeMesh.recieveShadow = true;
+                planeMesh.name = "plane";
+                scene.add(planeMesh);
+                objects.push(planeMesh);
+                break;
+            case areaTypes.gravel:
+                planeMesh = new THREE.Mesh(planeGeo, gravelMaterial);
+                planeMesh.recieveShadow = true;
+                planeMesh.name = "plane";
+                scene.add(planeMesh);
+                objects.push(planeMesh);
+                break;
+            case areaTypes.stone:
+                planeMesh = new THREE.Mesh(planeGeo, stoneMaterial);
+                planeMesh.recieveShadow = true;
+                planeMesh.name = "plane";
+                scene.add(planeMesh);
+                objects.push(planeMesh);
+                break;
+        }
+    });
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
 
     const areaFolder = gui.addFolder("Area");       //Area folder added
-    areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type").  //Add area type dropdown selector
-        onChange(() => {
-            console.log(world.areaTypes.type);
-        });
-    areaFolder.add(world.area, "createNew").name("New area");       //Add new area button
-    areaFolder.add(world.area, "continueArea").name("Continue Area");
-    areaFolder.add(world.area,"finishArea").name("Finish area");    //add finish area button
+    areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type");  //Add area type dropdown selector
+    areaFolder.add(world.area, "createNew").name("New area (Q)");       //Add new area button
+    areaFolder.add(world.area, "continueArea").name("Continue Area (W)");
+    areaFolder.add(world.area,"finishArea").name("Finish area (E)");    //add finish area button
+    areaFolder.add(world.area, "clearAreas").name("Clear areas (R)");
     //areaFolder.open();
 
     const objectFolder = gui.addFolder("Objects");              //Add the objects folder
-    objectFolder.add(world.objects, "place").name("Place");     //Add place, remove, move buttons
-    objectFolder.add(world.objects, "remove").name("Remove");
-    objectFolder.add(world.objects, "move").name("Move");
+    objectFolder.add(world.objects, "place").name("Place (A)");     //Add place, remove, move buttons
+    objectFolder.add(world.objects, "remove").name("Remove (S)");
+    objectFolder.add(world.objects, "move").name("Move (D)");
 
     const treeFolder = objectFolder.addFolder("Trees");         //Add tree folder to the objects folder
     treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
+    treeFolder.add(world.objects.trees, "tree2").name("Tree 2");
 
     const flowerFolder = objectFolder.addFolder("Flowers");
     flowerFolder.add(world.objects.flowers, "pot").name("Flower pot");
@@ -363,7 +404,8 @@ function init() {
     areaHeightOffset = 0;
 
     currentObject = placableObjects.trees.tree1;
-    currentObjectPath;
+    updateCurrentObjectPath();
+    changeMouseMode(mouseMode.none);
     currentScale = 10;
     currentRotation = 0;
     
@@ -571,6 +613,10 @@ function onPointerMove(event) {
                 break;
         }
     }
+    else{
+        if(rollOverMesh != null) rollOverMesh.visible = false;      //Removes the rollover mesh when the pointer isnt in a valid position
+        if(objectRolloverMesh != null) objectRolloverMesh.visible = false;
+    }
 }
 
 function onPointerDown(event) {
@@ -733,11 +779,7 @@ function onPointerDown(event) {
 function onDocumentKeyDown(event) {
 
     switch (event.keyCode) {
-        case 13: finalOutline(); break; //Enter
-        case 16: isShiftDown = true; break; //Shift
-        case 82: resetOutline(); break; //R
-        case 32: console.log(placedObjects); break; //space
-
+        /////Arrow keys//////
         case 38:    //Arrow up - scale up
             currentScale += 0.5; 
             console.log("Scale changed to: " + currentScale);
@@ -756,8 +798,23 @@ function onDocumentKeyDown(event) {
             currentRotation += 5;
             if(currentRotation > 360 ) currentRotation = 0;
             console.log("Rotation changed to: " + currentRotation);
-
             break; 
+
+        /////Macros/////
+        case 81: //q - new area
+            break;
+        case 87: //w - continue area
+            break;
+        case 69: //e - finish area
+            break;
+        case 82: //r - clear areas
+            break;
+        case 65: //a - place obj
+            break;
+        case 83: //s - remove obj 
+            break;
+        case 68: //d - move obj
+            break;
     }
 
     objectRolloverMesh.scale.set(currentScale,currentScale,currentScale);  //Set scale
@@ -815,7 +872,7 @@ function finalOutline() {
         }
 
         const areaMesh = new THREE.Mesh(areaGeo, selectedMat);  //Create the mesh with the selected material
-        areaMesh.name = "area" + areaID;    //Gives the area a name and id
+        areaMesh.name = "area " + areaID;    //Gives the area a name and id
         areaID++;   //increment id
         areas.push(areaMesh);
         scene.add(areaMesh);    //Add mesh to the scene
@@ -846,6 +903,16 @@ function resetOutline() {       //Clears nodes and outline points ready for a ne
     outlinePoints.length = 0;
 
     outlineFinished = false;
+}
+
+function clearAreas(){
+    for(let i in areas)
+    {
+        scene.remove(scene.getObjectByName("area "+i));
+    }
+    areas.length = 0;
+    console.log(areas);
+    areaID = 0;
 }
 
 function loadRollover()
