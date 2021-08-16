@@ -91,6 +91,8 @@ function init() {
 
     gui = new GUI();    //create the gui
 
+    gui.width = 300;
+
     world = {
         plane: {            //Controls for the plane
             width: 100,     //change width
@@ -802,6 +804,7 @@ function onDocumentKeyDown(event) {
 
         /////Macros/////
         case 81: //q - new area
+            changeMouseMode(mouseMode.areaDef);
             break;
         case 87: //w - continue area
             break;
@@ -810,10 +813,13 @@ function onDocumentKeyDown(event) {
         case 82: //r - clear areas
             break;
         case 65: //a - place obj
+            changeMouseMode(mouseMode.objectPlace);
             break;
         case 83: //s - remove obj 
+            changeMouseMode(mouseMode.objectRemove);
             break;
         case 68: //d - move obj
+        changeMouseMode(mouseMode.objectMove);
             break;
     }
 
