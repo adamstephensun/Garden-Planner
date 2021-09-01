@@ -229,6 +229,8 @@ function init() {
         //console.log(objects);
         scene.remove(planeMesh);    //deletes the old mesh
 
+        //reset size sliders to 100
+
         switch(world.plane.type)    //generates a new mesh with the selected material
         {
             case areaTypes.grass:
@@ -809,8 +811,10 @@ function onDocumentKeyDown(event) {
         case 87: //w - continue area
             break;
         case 69: //e - finish area
+            finalOutline();
             break;
         case 82: //r - clear areas
+            clearAreas();
             break;
         case 65: //a - place obj
             changeMouseMode(mouseMode.objectPlace);
