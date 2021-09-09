@@ -63,7 +63,7 @@ const mouseMode = {
 
 let currentMouseMode = mouseMode.areaDef;
 
-let currentObject, currentObjectPath, currentScale, currentRotation;
+let currentObject, currentObjectPath, isMoving, currentScale, currentRotation;
 
 //#endregion declarations
 
@@ -419,6 +419,7 @@ function init() {
     areaID = 0;
     objectID = 0;
     areaHeightOffset = 0;
+    isMoving = false;
 
     currentObject = placableObjects.trees.tree1;
     updateCurrentObjectPath();
@@ -722,13 +723,18 @@ function onPointerDown(event) {
                             placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
                             scene.add(placableObject);        //Add the object to the scene
 
-                            placableObject.name = "object " + objectID;   //Give the object a name with the id
+                            placableObject.name = currentObject;
                             objectID++;       //increment object id 
                             placedObjects.push(placableObject);               //Push object to the array of nodes
                             console.log("Pushed object:" + placableObject.name);
 
                             spawnSound.play();
+
                         });
+                    }
+                    if(isMoving) {
+                        changeMouseMode(mouseMode.none); 
+                        isMoving = false;
                     }
                 }
                 break;
@@ -785,13 +791,24 @@ function onPointerDown(event) {
                 if (intersects.length > 0) {    //If ray intersects with something
 
                     const intersect = intersects[0];
-                    const parentName = intersect.object.parent.name;
-                    scene.remove(scene.getObjectByName(parentName));  //Removes the parent of the object 
-                    console.log("Removed object: "+parentName);
+                    const parentId = intersect.object.parent.parent.id;
+                    currentObject = intersect.object.parent.parent.name;
+
+                    intersect.object.parent.traverse(n =>{
+                        scene.remove(n);
+                    })
+
+                    scene.remove(scene.getObjectById(parentId));  //Removes the parent of the object 
+                    console.log("Removed object: "+parentId);
 
                     const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
                     if(index > -1) placedObjects.splice(index,1);
                     deleteSound.play();
+                    ////Removed the object, get the object and set to place mode
+
+
+                    changeMouseMode(mouseMode.objectPlace);
+                    isMoving = true;
                 }
 
                 break;
