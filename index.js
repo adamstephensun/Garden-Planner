@@ -7,6 +7,7 @@ import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders
 
 //#region declarations
 let camera, listener, scene, renderer, controls, gui, world;
+let hemiLight, sunLight;
 let planeMesh;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
@@ -18,7 +19,7 @@ let rollOverMesh, rollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial;
 let nodeID, objectID;
 let outlineGeo, outlineMaterial;
-let areaGeo, areaID, areaHeightOffset;
+let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished = new Boolean;
 
 const objects = [];
@@ -79,13 +80,50 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.BasicShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
     document.body.appendChild(renderer.domElement);
 
     loadTextures();
 
     //#endregion renderer and scene setup
+
+    //#region lights
+
+    hemiLight = new THREE.HemisphereLight(0xffeeb1, 0x080820, 1);
+    scene.add(hemiLight);
+
+    sunLight = new THREE.SpotLight(0xffa95c,1);
+    sunLight.position.set(-50,100,50);
+    sunLight.castShadow = true;
+    sunLight.shadow.bias = -0.0001;
+    sunLight.shadow.mapSize.width = 1024;
+    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 500;
+
+    scene.add(sunLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    directionalLight.position.set(1, 0.75, 0.5).normalize();
+    directionalLight.castShadow = true;
+
+    directionalLight.shadow.mapSize.width = 512;
+    directionalLight.shadow.mapSize.height = 512;
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 500;
+
+    //scene.add(directionalLight);
+
+    const sphereGeometry = new THREE.SphereGeometry( 5, 32, 32 );
+    const sphereMaterial = new THREE.MeshStandardMaterial( { color: 0xfff000 } );
+    const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
+    sphere.position.set(0,7,0);
+    sphere.castShadow = true;
+    sphere.receiveShadow = true;
+    //scene.add( sphere );
+    //#endregion lights
 
     //#region GUI
 
@@ -214,14 +252,12 @@ function init() {
     planeFolder.add(world.plane, "width", 10, 300).name("Width"). //Add width slider
         onChange(() => {
             planeMesh.geometry.dispose();           //Remove old plane geo
-            planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);    //Create new plane geo with slider dimensions
-            planeMesh.geometry.rotateX(- Math.PI / 2);  //Rotate to make flat
+            planeMesh.geometry = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);    //Create new plane geo with slider dimensions
         });
     planeFolder.add(world.plane, "height", 10, 300).name("Height").    //Same with height
         onChange(() => {
             planeMesh.geometry.dispose();
-            planeMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
-            planeMesh.geometry.rotateX(- Math.PI / 2);
+            planeMesh.geometry = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);
         });
     planeFolder.add(world.plane, "type").options(areaTypes).name("Terrain type").   //Terrain type selector
     onChange(()=>{
@@ -336,6 +372,7 @@ function init() {
     const rollOverGeo = new THREE.SphereGeometry(1, 32, 32);
     rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
     rollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMaterial);
+    rollOverMesh.name = "Rollover";
     scene.add(rollOverMesh);
 
     objectRolloverMaterial = new THREE.MeshBasicMaterial({opacity: 0.5, transparent: true});
@@ -351,42 +388,18 @@ function init() {
 
     //#region plane & grid
 
-    const planeGeo = new THREE.PlaneGeometry(100, 100);
-    planeGeo.rotateX(- Math.PI / 2);
+    planeGeo = new THREE.BoxGeometry(100, 1, 100);
+    //planeGeo.rotateX(- Math.PI / 2);
 
     planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
-    planeMesh.recieveShadow = true;
+    planeMesh.castShadow = false;
+    planeMesh.receiveShadow = true;
     planeMesh.name = "plane";
     scene.add(planeMesh);
 
     objects.push(planeMesh);
 
     //#endregion plane & grid
-
-    //#region lights
-
-    const ambientLight = new THREE.AmbientLight(0x606060);
-    scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    directionalLight.position.set(1, 0.75, 0.5).normalize();
-    directionalLight.castShadow = true;
-
-    directionalLight.shadow.mapSize.width = 512;
-    directionalLight.shadow.mapSize.height = 512;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-
-    scene.add(directionalLight);
-
-    /*const sphereGeometry = new THREE.SphereGeometry( 5, 32, 32 );
-    const sphereMaterial = new THREE.MeshStandardMaterial( { color: 0xfff000 } );
-    const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
-    sphere.castShadow = true; //default is false
-    sphere.receiveShadow = false; //default
-    scene.add( sphere );*/
-
-    //#endregion lights
 
     //#region listeners
 
@@ -476,6 +489,7 @@ function loadAudio(){
     camera.add(listener);
 
     spawnSound = new THREE.Audio(listener);
+    spawnSound.name = "SpawnListener";
     scene.add(spawnSound);
 
     new THREE.AudioLoader().load('sounds/pop.wav', function (audioBuffer){
@@ -484,6 +498,7 @@ function loadAudio(){
     });
 
     deleteSound = new THREE.Audio(listener);
+    deleteSound.name = "DeleteListener";
     scene.add(deleteSound);
 
     new THREE.AudioLoader().load('sounds/click1.wav', function (audioBuffer){
@@ -694,9 +709,14 @@ function onPointerDown(event) {
                     if (objects.includes(intersect.object)){    //if intersect is included in the objects array
                         let placableObject;   //temp variable to store the gltf.scene object
 
-                        new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads marker post model
-                            placableObject = gltf.scene;      //gltf model assigned to node object
-                            placableObject.castShadow = true;
+                        new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads the current selected model
+                            placableObject = gltf.scene;      //gltf model assigned to temp variable
+                            placableObject.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
+                                if(n.isMesh){
+                                    n.castShadow = true;
+                                    n.receiveShadow = true;
+                                }
+                            })
                             placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
                             placableObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
                             placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
@@ -732,9 +752,14 @@ function onPointerDown(event) {
                 if (intersects.length > 0) {    //If ray intersects with something
 
                     const intersect = intersects[0];
-                    const parentName = intersect.object.parent.name;
-                    scene.remove(scene.getObjectByName(parentName));  //Removes the parent of the object 
-                    console.log("Removed object: "+parentName);
+                    const parentId = intersect.object.parent.parent.id;
+
+                    intersect.object.parent.traverse(n =>{
+                        scene.remove(n);
+                    })
+
+                    scene.remove(scene.getObjectById(parentId));  //Removes the parent of the object 
+                    console.log("Removed object: "+parentId);
 
                     const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
                     if(index > -1) placedObjects.splice(index,1);
