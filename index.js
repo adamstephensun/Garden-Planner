@@ -19,7 +19,7 @@ let rollOverMesh, rollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial;
 let nodeID, objectID;
 let outlineGeo, outlineMaterial;
-let gridGeo, gridMesh;
+let gridGeo, gridMesh, gridSnapFactor;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished = new Boolean;
 
@@ -138,6 +138,7 @@ function init() {
             height: 100,    //change height
             type: "Grass",
             grid: true,
+            snapToGrid: true,
             finalPlane: function() {    //Finalise the plane. Removes the folder so plane can't be changed again
                 gui.removeFolder(planeFolder);
                 console.log("Plane finalised");
@@ -315,6 +316,7 @@ function init() {
     planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{
         gridMesh.visible = world.plane.grid;
     })
+    planeFolder.add(world.plane, "snapToGrid").name("Snap to grid");
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
 
@@ -373,7 +375,7 @@ function init() {
     controls.screenSpacePanning = false;
     controls.minDistance = 10;      //Min and max zoom distances
     controls.maxDistance = 1500;
-    controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
+    //controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
 
     controls.mouseButtons = {
         MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
@@ -420,7 +422,7 @@ function init() {
 
     gridMesh = new THREE.Mesh(gridGeo, gridMaterial);
     gridGeo.rotateX(- Math.PI / 2);
-    gridMesh.position.set(gridMesh.position.x,gridMesh.position.y +0.6,gridMesh.position.z);
+    gridMesh.position.set(gridMesh.position.x,gridMesh.position.y +0.555,gridMesh.position.z);
     scene.add(gridMesh);
 
     //#endregion plane & grid
@@ -444,6 +446,7 @@ function init() {
     objectID = 0;
     areaHeightOffset = 0;
     isMoving = false;
+    gridSnapFactor = 5;
 
     currentObject = placableObjects.trees.tree1;
     updateCurrentObjectPath();
@@ -611,7 +614,7 @@ function loadTextures() {
     gridTexture = new THREE.TextureLoader().load("textures/grid.png");
     gridTexture.wrapS = THREE.RepeatWrapping;
     gridTexture.wrapT = THREE.RepeatWrapping;
-    gridTexture.repeat.set(10, 10);
+    gridTexture.repeat.set(20, 20);
 
     gridMaterial = new THREE.MeshPhongMaterial({
         color: 0xdddddd,
@@ -655,6 +658,7 @@ function onPointerMove(event) {
                 objectRolloverMesh.visible = true;
 
                 objectRolloverMesh.position.copy(intersect.point).add(intersect.face.normal);
+                if(world.plane.snapToGrid) objectRolloverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
                 objectRolloverMesh.scale.set(currentScale,currentScale,currentScale);  //Set scale
                 objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
                 
@@ -755,6 +759,9 @@ function onPointerDown(event) {
                             })
                             placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
                             placableObject.position.set(placableObject.position.x, placableObject.position.y -1, placableObject.position.z);    //Offset so objects aren't floating
+                            //placableObject.position.set(placableObject.position.x, placableObject.position.y -1, placableObject.position.z);    //Offset so objects aren't floating
+
+                            if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
                             placableObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
                             placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
                             scene.add(placableObject);        //Add the object to the scene
@@ -964,7 +971,7 @@ function finalOutline() {
         areaID++;   //increment id
         areas.push(areaMesh);
         scene.add(areaMesh);    //Add mesh to the scene
-        areaMesh.position.y -= 0.9 - areaHeightOffset; //Makes the area level (just above) the plane
+        areaMesh.position.y -= 0.95 - areaHeightOffset; //Makes the area level (just above) the plane
         areaHeightOffset += 0.005;  //Height offset is increased slightly each area generated to avoid z fighting
 
         console.log(areas);
