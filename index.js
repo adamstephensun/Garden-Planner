@@ -12,13 +12,14 @@ let planeMesh;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
 
-let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal;
-let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial;
+let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal, gridTexture;
+let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, gridMaterial;
 
 let rollOverMesh, rollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial;
 let nodeID, objectID;
 let outlineGeo, outlineMaterial;
+let gridGeo, gridMesh;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished = new Boolean;
 
@@ -136,6 +137,7 @@ function init() {
             width: 100,     //change width
             height: 100,    //change height
             type: "Grass",
+            grid: true,
             finalPlane: function() {    //Finalise the plane. Removes the folder so plane can't be changed again
                 gui.removeFolder(planeFolder);
                 console.log("Plane finalised");
@@ -249,15 +251,26 @@ function init() {
 
     //#region GUI folders
     const planeFolder = gui.addFolder("Plane");     //Plane folder created
-    planeFolder.add(world.plane, "width", 10, 300).name("Width"). //Add width slider
+    planeFolder.add(world.plane, "width", 10, 300, 10).name("Width"). //Add width slider
         onChange(() => {
             planeMesh.geometry.dispose();           //Remove old plane geo
             planeMesh.geometry = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);    //Create new plane geo with slider dimensions
+            
+            gridMesh.geometry.dispose();
+            gridTexture.repeat.set(world.plane.width/10, world.plane.height/10);
+            gridMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
+            gridMesh.geometry.rotateX(- Math.PI / 2);
+
         });
-    planeFolder.add(world.plane, "height", 10, 300).name("Height").    //Same with height
+    planeFolder.add(world.plane, "height", 10, 300, 10).name("Height").    //Same with height
         onChange(() => {
             planeMesh.geometry.dispose();
             planeMesh.geometry = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);
+
+            gridMesh.geometry.dispose();
+            gridTexture.repeat.set(world.plane.width/10, world.plane.height/10);
+            gridMesh.geometry = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
+            gridMesh.geometry.rotateX(- Math.PI / 2);
         });
     planeFolder.add(world.plane, "type").options(areaTypes).name("Terrain type").   //Terrain type selector
     onChange(()=>{
@@ -299,6 +312,9 @@ function init() {
                 break;
         }
     });
+    planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{
+        gridMesh.visible = world.plane.grid;
+    })
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
 
@@ -391,13 +407,21 @@ function init() {
     planeGeo = new THREE.BoxGeometry(100, 1, 100);
     //planeGeo.rotateX(- Math.PI / 2);
 
+    
     planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
     planeMesh.castShadow = false;
     planeMesh.receiveShadow = true;
     planeMesh.name = "plane";
     scene.add(planeMesh);
-
+    
     objects.push(planeMesh);
+
+    gridGeo = new THREE.PlaneGeometry(100,100);
+
+    gridMesh = new THREE.Mesh(gridGeo, gridMaterial);
+    gridGeo.rotateX(- Math.PI / 2);
+    gridMesh.position.set(gridMesh.position.x,gridMesh.position.y +0.6,gridMesh.position.z);
+    scene.add(gridMesh);
 
     //#endregion plane & grid
 
@@ -584,8 +608,19 @@ function loadTextures() {
         side: THREE.DoubleSide
     })
 
+    gridTexture = new THREE.TextureLoader().load("textures/grid.png");
+    gridTexture.wrapS = THREE.RepeatWrapping;
+    gridTexture.wrapT = THREE.RepeatWrapping;
+    gridTexture.repeat.set(10, 10);
+
+    gridMaterial = new THREE.MeshPhongMaterial({
+        color: 0xdddddd,
+        map: gridTexture,
+        transparent: true
+    })
 
     /////Other mats/////
+
 
     outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
 
@@ -719,6 +754,7 @@ function onPointerDown(event) {
                                 }
                             })
                             placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                            placableObject.position.set(placableObject.position.x, placableObject.position.y -1, placableObject.position.z);    //Offset so objects aren't floating
                             placableObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
                             placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
                             scene.add(placableObject);        //Add the object to the scene
