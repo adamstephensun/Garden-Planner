@@ -35,6 +35,9 @@ const placableObjects = {
     trees:{
         tree1: "Tree 1", tree2: "Tree 2", tree3: "Tree 3"
     },
+    plants:{
+        tomato: "Tomato", strawberry: "Strawberry", cucumber: "Cucumber", lettuce: "Lettuce", carrot: "Carrot"
+    },
     flowers:{
         pot: "Pot", redFlower: "Red flower", whiteFlower: "White flower", sunflower: "Sunflower"
     },
@@ -184,6 +187,28 @@ function init() {
                 },
                 tree3: function(){
                     currentObject = placableObjects.trees.tree3;
+                    updateCurrentObjectPath();
+                }
+            },
+            plants:{
+                tomato: function(){
+                    currentObject = placableObjects.plants.tomato;
+                    updateCurrentObjectPath();
+                },
+                strawberry: function(){
+                    currentObject = placableObjects.plants.strawberry;
+                    updateCurrentObjectPath();
+                },
+                cucumber: function(){
+                    currentObject = placableObjects.plants.cucumber;
+                    updateCurrentObjectPath();
+                },
+                lettuce: function(){
+                    currentObject = placableObjects.plants.lettuce;
+                    updateCurrentObjectPath();
+                },
+                carrot: function(){
+                    currentObject = placableObjects.plants.carrot;
                     updateCurrentObjectPath();
                 }
             },
@@ -351,6 +376,13 @@ function init() {
     treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
     treeFolder.add(world.objects.trees, "tree2").name("Tree 2");
 
+    const plantFolder = objectFolder.addFolder("Plants");
+    plantFolder.add(world.objects.plants, "tomato").name("Tomato");
+    plantFolder.add(world.objects.plants, "strawberry").name("Strawberry");
+    plantFolder.add(world.objects.plants, "cucumber").name("Cucumber");
+    plantFolder.add(world.objects.plants, "lettuce").name("Lettuce");
+    plantFolder.add(world.objects.plants, "carrot").name("Carrot");
+
     const flowerFolder = objectFolder.addFolder("Flowers");
     flowerFolder.add(world.objects.flowers, "pot").name("Flower pot");
     flowerFolder.add(world.objects.flowers, "redFlower").name("Red flower");
@@ -474,7 +506,7 @@ function init() {
     currentRotation = 0;
     
     loadAudio();
- 
+    loadRollover();
 
     //#endregion assignments and loaders
 
@@ -490,6 +522,22 @@ function updateCurrentObjectPath(){
             break;
         case placableObjects.trees.tree3:
             currentObjectPath = 'models/trees/tree3.gltf';
+            break;
+        /////Plants//////
+        case placableObjects.plants.tomato:
+            currentObjectPath = 'models/plants/tomato.gltf';
+            break;
+        case placableObjects.plants.strawberry:
+            currentObjectPath = 'models/plants/strawberry.gltf';
+            break;
+        case placableObjects.plants.cucumber:
+            currentObjectPath = 'models/plants/cucumber.gltf';
+            break;
+        case placableObjects.plants.lettuce:
+            currentObjectPath = 'models/plants/lettuce.gltf';
+            break;
+        case placableObjects.plants.carrot:
+            currentObjectPath = 'models/plants/carrot.gltf';
             break;
         /////Flowers/////
         case placableObjects.flowers.pot:
@@ -539,6 +587,9 @@ function updateCurrentObjectPath(){
     changeMouseMode(mouseMode.objectPlace);
     console.log("Current object updated to: " + currentObject);
     loadRollover();
+    
+    currentScale = 10;
+    currentRotation = 0;
 }
 
 function loadAudio(){
