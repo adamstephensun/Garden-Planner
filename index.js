@@ -23,7 +23,7 @@ let gridGeo, gridMesh, gridSnapFactor;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished = new Boolean;
 
-const objects = [];
+const collisionObjects = [];
 const nodes = [];
 const areas = [];
 const outlinePoints = [];
@@ -51,6 +51,9 @@ const placableObjects = {
         tables:{
             table1: "Table 1", table2: "Table 2", table3: "Table 3"
         }
+    },
+    beds:{
+        squareRaised: "Square raised", rectRaised: "Rectangle raised", triangleRaised: "Triangle raised"
     }
 }
 
@@ -203,18 +206,15 @@ function init() {
                 }
             },
             bushes:{
-                bush1: function()
-                {
+                bush1: function(){
                     currentObject = placableObjects.bushes.bush1;
                     updateCurrentObjectPath();
                 },
-                bush2: function()
-                {
+                bush2: function(){
                     currentObject = placableObjects.bushes.bush2;
                     updateCurrentObjectPath();
                 },
-                bush3: function()
-                {
+                bush3: function(){
                     currentObject = placableObjects.bushes.bush3;
                     updateCurrentObjectPath();
                 }
@@ -246,6 +246,20 @@ function init() {
                         updateCurrentObjectPath();
                     }
                 }
+            },
+            beds:{
+                squareRaised: function(){
+                    currentObject = placableObjects.beds.squareRaised;
+                    updateCurrentObjectPath();
+                },
+                rectRaised: function(){
+                    currentObject = placableObjects.beds.rectRaised;
+                    updateCurrentObjectPath();
+                },
+                triangleRaised: function(){
+                    currentObject = placableObjects.beds.triangleRaised;
+                    updateCurrentObjectPath();
+                }
             }
         }
     }
@@ -275,7 +289,7 @@ function init() {
         });
     planeFolder.add(world.plane, "type").options(areaTypes).name("Terrain type").   //Terrain type selector
     onChange(()=>{
-        objects.length = 0; //Clears the objects array
+        collisionObjects.length = 0; //Clears the objects array
         //console.log(objects);
         scene.remove(planeMesh);    //deletes the old mesh
 
@@ -288,28 +302,28 @@ function init() {
                 planeMesh.recieveShadow = true;
                 planeMesh.name = "plane";
                 scene.add(planeMesh);
-                objects.push(planeMesh);
+                collisionObjects.push(planeMesh);
                 break;
             case areaTypes.soil:
                 planeMesh = new THREE.Mesh(planeGeo, soilMaterial);
                 planeMesh.recieveShadow = true;
                 planeMesh.name = "plane";
                 scene.add(planeMesh);
-                objects.push(planeMesh);
+                collisionObjects.push(planeMesh);
                 break;
             case areaTypes.gravel:
                 planeMesh = new THREE.Mesh(planeGeo, gravelMaterial);
                 planeMesh.recieveShadow = true;
                 planeMesh.name = "plane";
                 scene.add(planeMesh);
-                objects.push(planeMesh);
+                collisionObjects.push(planeMesh);
                 break;
             case areaTypes.stone:
                 planeMesh = new THREE.Mesh(planeGeo, stoneMaterial);
                 planeMesh.recieveShadow = true;
                 planeMesh.name = "plane";
                 scene.add(planeMesh);
-                objects.push(planeMesh);
+                collisionObjects.push(planeMesh);
                 break;
         }
     });
@@ -352,6 +366,11 @@ function init() {
     furnitureFolder.add(world.objects.furniture.benches, "bench1").name("Bench 1");
     furnitureFolder.add(world.objects.furniture.chairs, "chair1").name("Chair 1");
     furnitureFolder.add(world.objects.furniture.tables, "table1").name("Table 1");
+
+    const bedsFolder = objectFolder.addFolder("Beds");
+    bedsFolder.add(world.objects.beds, "squareRaised").name("Square raised");
+    bedsFolder.add(world.objects.beds, "rectRaised").name("Rectangle raised");
+    bedsFolder.add(world.objects.beds, "triangleRaised").name("Triangle raised");
 
     //objectFolder.open();
 
@@ -416,7 +435,7 @@ function init() {
     planeMesh.name = "plane";
     scene.add(planeMesh);
     
-    objects.push(planeMesh);
+    collisionObjects.push(planeMesh);
 
     gridGeo = new THREE.PlaneGeometry(100,100);
 
@@ -504,6 +523,16 @@ function updateCurrentObjectPath(){
             break;
         case placableObjects.furniture.tables.table1:
             currentObjectPath = 'models/furniture/table1.gltf';
+            break;
+        /////Beds////////
+        case placableObjects.beds.squareRaised:
+            currentObjectPath = 'models/beds/squareRaised.gltf';
+            break;
+        case placableObjects.beds.rectRaised:
+            currentObjectPath = 'models/beds/rectRaised.gltf';
+            break;
+        case placableObjects.beds.triangleRaised:
+            currentObjectPath = 'models/beds/triangleRaised.gltf';
             break;
     }
 
@@ -641,7 +670,7 @@ function onPointerMove(event) {
 
     pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
     raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(objects); //objects[] contains the plane
+    const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
 
     if (intersects.length > 0) {
 
@@ -691,12 +720,12 @@ function onPointerDown(event) {
 
                     pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                     raycaster.setFromCamera(pointer, camera);
-                    const intersects = raycaster.intersectObjects(objects);
+                    const intersects = raycaster.intersectObjects(collisionObjects);
     
                     if (intersects.length > 0) {    //If ray intersects with something
     
                         const intersect = intersects[0];
-                        if (objects.includes(intersect.object)){    //if intersect is included in the objects array
+                        if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
                             let node;   //temp variable to store the gltf.scene object
     
                             new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
@@ -741,12 +770,12 @@ function onPointerDown(event) {
 
                 pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                 raycaster.setFromCamera(pointer, camera);
-                const intersects = raycaster.intersectObjects(objects); //objects[] contains the plane
+                const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
 
                 if (intersects.length > 0) {    //If ray intersects with something
 
                     const intersect = intersects[0];
-                    if (objects.includes(intersect.object)){    //if intersect is included in the objects array
+                    if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
                         let placableObject;   //temp variable to store the gltf.scene object
 
                         new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads the current selected model
@@ -758,26 +787,34 @@ function onPointerDown(event) {
                                 }
                             })
                             placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                            placableObject.position.set(placableObject.position.x, placableObject.position.y -1, placableObject.position.z);    //Offset so objects aren't floating
-                            //placableObject.position.set(placableObject.position.x, placableObject.position.y -1, placableObject.position.z);    //Offset so objects aren't floating
+                            placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y -1, objectRolloverMesh.position.z);    //Offset so objects aren't floating
 
-                            if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
+                            if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
                             placableObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
                             placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
                             scene.add(placableObject);        //Add the object to the scene
 
                             placableObject.name = currentObject;
-                            objectID++;       //increment object id 
-                            placedObjects.push(placableObject);               //Push object to the array of nodes
-                            console.log("Pushed object:" + placableObject.name);
 
+                            if(placableObject.name == "Pot" || placableObject.name == "Square raised"){
+                                collisionObjects.push(placableObject);    //If obj is to be used to stack, add to collision array
+                                console.log("Pushed object:" + placableObject.name + " to collisionObjects");
+                            } 
+                            else {
+                                placedObjects.push(placableObject);               //if obj is not to be collided with, add to array of objs
+                                console.log("Pushed object:" + placableObject.name + " to placedObjects");
+                            }
+
+                            //objectID++;       //increment object id 
+                            
+                            
                             spawnSound.play();
-
                         });
                     }
                     if(isMoving) {
-                        changeMouseMode(mouseMode.none); 
+                        changeMouseMode(mouseMode.objectMove); 
                         isMoving = false;
+                        objectRolloverMesh.visible = false;
                     }
                 }
                 break;
