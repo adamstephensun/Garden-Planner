@@ -57,6 +57,9 @@ const placableObjects = {
     },
     beds:{
         squareRaised: "Square raised", rectRaised: "Rectangle raised", triangleRaised: "Triangle raised"
+    },
+    walls:{
+        fenceLow: "Low fence", fenceHigh: "High fence", brickLow: "Low Brick", brickHigh: "High brick", stoneLow: "Low stone", stoneHigh: "High stone"
     }
 }
 
@@ -285,6 +288,32 @@ function init() {
                     currentObject = placableObjects.beds.triangleRaised;
                     updateCurrentObjectPath();
                 }
+            },
+            walls:{
+                fenceLow: function(){
+                    currentObject = placableObjects.walls.fenceLow;
+                    updateCurrentObjectPath();
+                },
+                fenceHigh: function(){
+                    currentObject = placableObjects.walls.fenceHigh;
+                    updateCurrentObjectPath();
+                },
+                brickLow: function(){
+                    currentObject = placableObjects.walls.brickLow;
+                    updateCurrentObjectPath();
+                },
+                brickHigh: function(){
+                    currentObject = placableObjects.walls.brickHigh;
+                    updateCurrentObjectPath();
+                },
+                stoneLow: function(){
+                    currentObject = placableObjects.walls.stoneLow;
+                    updateCurrentObjectPath();
+                },
+                stoneHigh: function(){
+                    currentObject = placableObjects.walls.stoneHigh;
+                    updateCurrentObjectPath();
+                },
             }
         }
     }
@@ -352,9 +381,7 @@ function init() {
                 break;
         }
     });
-    planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{
-        gridMesh.visible = world.plane.grid;
-    })
+    planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{ gridMesh.visible = world.plane.grid; })
     planeFolder.add(world.plane, "snapToGrid").name("Snap to grid");
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
@@ -404,7 +431,13 @@ function init() {
     bedsFolder.add(world.objects.beds, "rectRaised").name("Rectangle raised");
     bedsFolder.add(world.objects.beds, "triangleRaised").name("Triangle raised");
 
-    //objectFolder.open();
+    const wallFolder = objectFolder.addFolder("Walls");
+    wallFolder.add(world.objects.walls, "fenceLow").name("Low fence");
+    wallFolder.add(world.objects.walls, "fenceHigh").name("High fence");
+    wallFolder.add(world.objects.walls, "brickLow").name("Low brick");
+    wallFolder.add(world.objects.walls, "brickHigh").name("High brick");
+    wallFolder.add(world.objects.walls, "stoneLow").name("Low stone");
+    wallFolder.add(world.objects.walls, "stoneHigh").name("High stone");
 
     //#endregion GUI folders
 
@@ -582,12 +615,31 @@ function updateCurrentObjectPath(){
         case placableObjects.beds.triangleRaised:
             currentObjectPath = 'models/beds/triangleRaised.gltf';
             break;
+        /////Walls//////
+        case placableObjects.walls.fenceLow:
+            currentObjectPath = 'models/walls/fenceLow.gltf';
+            break;
+        case placableObjects.walls.fenceHigh:
+            currentObjectPath = 'models/walls/fenceHigh.gltf';
+            break;
+        case placableObjects.walls.brickLow:
+            currentObjectPath = 'models/walls/brickLow.gltf';
+            break;
+        case placableObjects.walls.brickHigh:
+            currentObjectPath = 'models/walls/brickHigh.gltf';
+            break;
+        case placableObjects.walls.stoneLow:
+            currentObjectPath = 'models/walls/stoneLow.gltf';
+            break;
+        case placableObjects.walls.stoneHigh:
+            currentObjectPath = 'models/walls/stoneHigh.gltf';
+            break;
     }
 
     changeMouseMode(mouseMode.objectPlace);
     console.log("Current object updated to: " + currentObject);
     loadRollover();
-    
+
     currentScale = 10;
     currentRotation = 0;
 }
