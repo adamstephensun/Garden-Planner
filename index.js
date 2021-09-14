@@ -8,6 +8,7 @@ import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders
 //#region declarations
 let camera, listener, scene, renderer, controls, gui, world;
 let hemiLight, sunLight;
+let sunPosition,sunGeometry, sunMaterial, sunSphere, orbitRadius, timestamp, timeScale;
 let planeMesh;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
@@ -17,7 +18,7 @@ let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, gridMaterial;
 
 let rollOverMesh, rollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial;
-let nodeID, objectID;
+let nodeID;
 let outlineGeo, outlineMaterial;
 let gridGeo, gridMesh, gridSnapFactor;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
@@ -100,11 +101,15 @@ function init() {
 
     loadTextures();
 
+    const axesHelper = new THREE.AxesHelper(10);
+    axesHelper.position.set(0,7,0);
+    scene.add(axesHelper);
+
     //#endregion renderer and scene setup
 
     //#region lights
 
-    hemiLight = new THREE.HemisphereLight(0xffeeb1, 0x080820, 1);
+    hemiLight = new THREE.HemisphereLight(0xfdfbd3 , 0x34ad61, 0.3);
     scene.add(hemiLight);
 
     sunLight = new THREE.SpotLight(0xffa95c,1);
@@ -118,24 +123,23 @@ function init() {
 
     scene.add(sunLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    directionalLight.position.set(1, 0.75, 0.5).normalize();
-    directionalLight.castShadow = true;
+    sunPosition = new THREE.Object3D;
 
-    directionalLight.shadow.mapSize.width = 512;
-    directionalLight.shadow.mapSize.height = 512;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
+    orbitRadius = 100;
 
-    //scene.add(directionalLight);
+    sunGeometry = new THREE.SphereGeometry( 5, 32, 32 );
+    sunMaterial = new THREE.MeshStandardMaterial( { color: 0xfff000, emissive: 0xfff000, emissiveIntensity: 10 } );
+    sunSphere = new THREE.Mesh( sunGeometry, sunMaterial );
+    
+    scene.add(sunSphere);
 
-    const sphereGeometry = new THREE.SphereGeometry( 5, 32, 32 );
-    const sphereMaterial = new THREE.MeshStandardMaterial( { color: 0xfff000 } );
-    const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
-    sphere.position.set(0,7,0);
-    sphere.castShadow = true;
-    sphere.receiveShadow = true;
-    //scene.add( sphere );
+    new GLTFLoader().load('models/leisure/bbq.gltf', function(gltf){
+        const obj = gltf.scene;
+        obj.position.set(0,1,0);
+        obj.scale.set(10,10,10);
+        scene.add(obj);
+    })
+
     //#endregion lights
 
     //#region GUI
@@ -464,6 +468,13 @@ function init() {
     wallFolder.add(world.objects.walls, "stoneLow").name("Low stone");
     wallFolder.add(world.objects.walls, "stoneHigh").name("High stone");
 
+    const leisureFolder = objectFolder.addFolder("Leisure");
+    leisureFolder.add(world.objects.leisure, "bbq").name("BBQ");
+    leisureFolder.add(world.objects.leisure, "firepit").name("Firepit");
+    leisureFolder.add(world.objects.leisure, "swing").name("Swing");
+    leisureFolder.add(world.objects.leisure, "goal").name("Goal");
+    leisureFolder.add(world.objects.leisure, "sandbox").name("Sandbox");
+
     //#endregion GUI folders
 
     //#endregion GUI
@@ -552,10 +563,10 @@ function init() {
     outlineFinished = false;
     nodeID = 0;
     areaID = 0;
-    objectID = 0;
     areaHeightOffset = 0;
     isMoving = false;
     gridSnapFactor = 5;
+    timeScale = 0.001;
 
     currentObject = placableObjects.trees.tree1;
     updateCurrentObjectPath();
@@ -658,6 +669,10 @@ function updateCurrentObjectPath(){
             break;
         case placableObjects.walls.stoneHigh:
             currentObjectPath = 'models/walls/stoneHigh.gltf';
+            break;
+        /////Leisure/////
+        case placableObjects.leisure.bbq:
+            currentObjectPath = 'models/leisure/bbq.gltf';
             break;
     }
 
@@ -932,10 +947,6 @@ function onPointerDown(event) {
                                 placedObjects.push(placableObject);               //if obj is not to be collided with, add to array of objs
                                 console.log("Pushed object:" + placableObject.name + " to placedObjects");
                             }
-
-                            //objectID++;       //increment object id 
-                            
-                            
                             spawnSound.play();
                         });
                     }
@@ -1092,6 +1103,13 @@ function render() {
 
     requestAnimationFrame(render);
     controls.update();
+
+
+    timestamp = Date.now() * timeScale;
+    sunPosition.position.set(Math.cos(timestamp)*orbitRadius, Math.cos(timestamp) * orbitRadius, Math.sin(timestamp) * orbitRadius);
+    sunLight.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
+    sunSphere.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
+
     renderer.render(scene, camera);
 }
 render();
