@@ -60,6 +60,9 @@ const placableObjects = {
     },
     walls:{
         fenceLow: "Low fence", fenceHigh: "High fence", brickLow: "Low Brick", brickHigh: "High brick", stoneLow: "Low stone", stoneHigh: "High stone"
+    },
+    leisure:{
+        bbq: "BBQ", firepit: "Firepit", swing: "Swing", goal: "Goal", sandbox: "Sandbox"
     }
 }
 
@@ -314,6 +317,28 @@ function init() {
                     currentObject = placableObjects.walls.stoneHigh;
                     updateCurrentObjectPath();
                 },
+            },
+            leisure:{
+                bbq: function(){
+                    currentObject = placableObjects.leisure.bbq;
+                    updateCurrentObjectPath();
+                },
+                firepit: function(){
+                    currentObject = placableObjects.leisure.firepit;
+                    updateCurrentObjectPath();
+                },
+                swing: function(){
+                    currentObject = placableObjects.leisure.swing;
+                    updateCurrentObjectPath();
+                },
+                goal: function(){
+                    currentObject = placableObjects.leisure.goal;
+                    updateCurrentObjectPath();
+                },
+                sandbox: function(){
+                    currentObject = placableObjects.leisure.sandbox;
+                    updateCurrentObjectPath();
+                }
             }
         }
     }
