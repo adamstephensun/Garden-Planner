@@ -7,8 +7,8 @@ import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders
 
 //#region declarations
 let camera, listener, scene, renderer, controls, gui, world;
-let hemiLight, sunLight;
-let sunPosition,sunGeometry, sunMaterial, sunSphere, orbitRadius, timestamp, timeScale;
+let hemiLight, sunLight, moonLight;
+let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp;
 let planeMesh;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
@@ -77,7 +77,7 @@ const mouseMode = {
 
 let currentMouseMode = mouseMode.areaDef;
 
-let currentObject, currentObjectPath, isMoving, currentScale, currentRotation;
+let currentObject, currentObjectPath, isMoving, currentObjectScale, currentObjectRotation;
 
 //#endregion declarations
 
@@ -113,32 +113,33 @@ function init() {
     scene.add(hemiLight);
 
     sunLight = new THREE.SpotLight(0xffa95c,1);
-    sunLight.position.set(-50,100,50);
     sunLight.castShadow = true;
     sunLight.shadow.bias = -0.0001;
-    sunLight.shadow.mapSize.width = 1024;
-    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.mapSize.width = 1024 *2;
+    sunLight.shadow.mapSize.height = 1024*2;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 500;
 
+    moonLight = new THREE.SpotLight(0xffffff,0.2);
+    moonLight.castShadow = true;
+    moonLight.shadow.bias = -0.0001;
+    moonLight.shadow.mapSize.width = 1024*2;
+    moonLight.shadow.mapSize.height = 1024*2;
+    moonLight.shadow.camera.near = 0.5;
+    moonLight.shadow.camera.far = 500;
+
     scene.add(sunLight);
+    scene.add(moonLight);
 
     sunPosition = new THREE.Object3D;
 
-    orbitRadius = 100;
-
     sunGeometry = new THREE.SphereGeometry( 5, 32, 32 );
-    sunMaterial = new THREE.MeshStandardMaterial( { color: 0xfff000, emissive: 0xfff000, emissiveIntensity: 10 } );
     sunSphere = new THREE.Mesh( sunGeometry, sunMaterial );
     
-    scene.add(sunSphere);
+    moonSphere = new THREE.Mesh(sunGeometry, moonMaterial);
 
-    new GLTFLoader().load('models/leisure/bbq.gltf', function(gltf){
-        const obj = gltf.scene;
-        obj.position.set(0,1,0);
-        obj.scale.set(10,10,10);
-        scene.add(obj);
-    })
+    scene.add(sunSphere);
+    scene.add(moonSphere);
 
     //#endregion lights
 
@@ -175,6 +176,12 @@ function init() {
             clearAreas: function(){
                 clearAreas();
             }
+        },
+        lights:{
+            timeScale: 3,
+            orbitRadius: 100,
+            sunCycleActive: true,
+            flatLighting: false
         },
         objects:{       //Stores all the placable objects
             place: function(){      //Button to place objects
@@ -415,13 +422,27 @@ function init() {
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
 
+    const lightFolder = gui.addFolder("Lights");
+    lightFolder.add(world.lights, "timeScale", 1,10, 1).name("Orbit speed");
+    lightFolder.add(world.lights, "sunCycleActive").name("Sun cycle");
+    lightFolder.add(world.lights, "flatLighting").name("Flat lighting").onChange(()=>{
+        sunLight.visible = !world.lights.flatLighting;
+        moonLight.visible = !world.lights.flatLighting;
+        sunSphere.visible = !world.lights.flatLighting;
+        moonSphere.visible = !world.lights.flatLighting;
+
+        if(world.lights.flatLighting){
+            hemiLight.intensity = 0.8;
+        }
+        else hemiLight.intensity = 0.3;
+    } );
+
     const areaFolder = gui.addFolder("Area");       //Area folder added
     areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type");  //Add area type dropdown selector
     areaFolder.add(world.area, "createNew").name("New area (Q)");       //Add new area button
     areaFolder.add(world.area, "continueArea").name("Continue Area (W)");
     areaFolder.add(world.area,"finishArea").name("Finish area (E)");    //add finish area button
     areaFolder.add(world.area, "clearAreas").name("Clear areas (R)");
-    //areaFolder.open();
 
     const objectFolder = gui.addFolder("Objects");              //Add the objects folder
     objectFolder.add(world.objects, "place").name("Place (A)");     //Add place, remove, move buttons
@@ -566,13 +587,12 @@ function init() {
     areaHeightOffset = 0;
     isMoving = false;
     gridSnapFactor = 5;
-    timeScale = 0.001;
 
     currentObject = placableObjects.trees.tree1;
     updateCurrentObjectPath();
     changeMouseMode(mouseMode.none);
-    currentScale = 10;
-    currentRotation = 0;
+    currentObjectScale = 10;
+    currentObjectRotation = 0;
     
     loadAudio();
     loadRollover();
@@ -680,8 +700,8 @@ function updateCurrentObjectPath(){
     console.log("Current object updated to: " + currentObject);
     loadRollover();
 
-    currentScale = 10;
-    currentRotation = 0;
+    currentObjectScale = 10;
+    currentObjectRotation = 0;
 }
 
 function loadAudio(){
@@ -794,8 +814,27 @@ function loadTextures() {
         transparent: true
     })
 
+    
+    
     /////Other mats/////
+    
+    sunTexture = new THREE.TextureLoader().load("textures/sun.png");
 
+    sunMaterial = new THREE.MeshStandardMaterial( { 
+        color: 0xffbb00,
+        map: sunTexture,
+        emissive: 0xffbb00,
+        emissiveIntensity: 5
+    } );
+    
+    moonTexture = new THREE.TextureLoader().load("textures/moon.png");
+
+    moonMaterial =  new THREE.MeshStandardMaterial( { 
+        color: 0xffffff, 
+        map: moonTexture,
+        emissive: 0xffffff, 
+        emissiveIntensity: 0.5 
+    } );
 
     outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
 
@@ -831,8 +870,8 @@ function onPointerMove(event) {
 
                 objectRolloverMesh.position.copy(intersect.point).add(intersect.face.normal);
                 if(world.plane.snapToGrid) objectRolloverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
-                objectRolloverMesh.scale.set(currentScale,currentScale,currentScale);  //Set scale
-                objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
+                objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
+                objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
                 
                 break;
             case mouseMode.objectRemove:
@@ -933,8 +972,8 @@ function onPointerDown(event) {
                             placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y -1, objectRolloverMesh.position.z);    //Offset so objects aren't floating
 
                             if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
-                            placableObject.scale.set(currentScale,currentScale,currentScale);  //Set scale
-                            placableObject.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
+                            placableObject.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
+                            placableObject.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
                             scene.add(placableObject);        //Add the object to the scene
 
                             placableObject.name = currentObject;
@@ -1046,23 +1085,23 @@ function onDocumentKeyDown(event) {
     switch (event.keyCode) {
         /////Arrow keys//////
         case 38:    //Arrow up - scale up
-            currentScale += 0.5; 
-            console.log("Scale changed to: " + currentScale);
+            currentObjectScale += 0.5; 
+            console.log("Scale changed to: " + currentObjectScale);
             break; 
         case 40:    //Arrow down - scale down
-            currentScale -= 0.5; 
-            if(currentScale < 0 ) currentScale = 0.5;
-            console.log("Scale changed to: " + currentScale);
+            currentObjectScale -= 0.5; 
+            if(currentObjectScale < 0 ) currentObjectScale = 0.5;
+            console.log("Scale changed to: " + currentObjectScale);
             break; 
         case 37:  //Arrow left - -rotation
-            currentRotation -= 5;
-            if(currentRotation <0 ) currentRotation = 360;  //Loops rotation 
-            console.log("Rotation changed to: " + currentRotation);
+            currentObjectRotation -= 5;
+            if(currentObjectRotation <0 ) currentObjectRotation = 360;  //Loops rotation 
+            console.log("Rotation changed to: " + currentObjectRotation);
             break; 
         case 39:  //Arrow right - +rotation
-            currentRotation += 5;
-            if(currentRotation > 360 ) currentRotation = 0;
-            console.log("Rotation changed to: " + currentRotation);
+            currentObjectRotation += 5;
+            if(currentObjectRotation > 360 ) currentObjectRotation = 0;
+            console.log("Rotation changed to: " + currentObjectRotation);
             break; 
 
         /////Macros/////
@@ -1088,8 +1127,8 @@ function onDocumentKeyDown(event) {
             break;
     }
 
-    objectRolloverMesh.scale.set(currentScale,currentScale,currentScale);  //Set scale
-    objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentRotation);  //Set rotation
+    objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
+    objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
 }
 
 function onDocumentKeyUp(event) {
@@ -1104,11 +1143,19 @@ function render() {
     requestAnimationFrame(render);
     controls.update();
 
-
-    timestamp = Date.now() * timeScale;
-    sunPosition.position.set(Math.cos(timestamp)*orbitRadius, Math.cos(timestamp) * orbitRadius, Math.sin(timestamp) * orbitRadius);
-    sunLight.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
-    sunSphere.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
+    if(world.lights.sunCycleActive)
+    {
+        timestamp = Date.now() * world.lights.timeScale * 0.0001;
+        sunPosition.position.set(Math.cos(timestamp)*world.lights.orbitRadius,
+         Math.sin(timestamp) * world.lights.orbitRadius *1.5,
+         Math.sin(timestamp) * world.lights.orbitRadius);
+        
+        sunLight.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
+        sunSphere.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
+        
+        moonLight.position.set(-sunPosition.position.x, -sunPosition.position.y, -sunPosition.position.z);
+        moonSphere.position.set(-sunPosition.position.x, -sunPosition.position.y, -sunPosition.position.z);
+    }
 
     renderer.render(scene, camera);
 }
