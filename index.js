@@ -4,25 +4,29 @@ import { OrbitControls } from "https://unpkg.com/three@0.126.1/examples/jsm/cont
 import { ConvexGeometry } from "https://unpkg.com/three@0.126.1/examples/jsm/geometries/ConvexGeometry.js";
 import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.module.js";
 import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFExporter } from "https://unpkg.com/three@0.126.1/examples/jsm/exporters/GLTFExporter.js";
 
 //#region declarations
 let camera, listener, scene, renderer, controls, gui, world;
 let hemiLight, sunLight, moonLight;
-let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp;
+let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
 let planeMesh;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
 
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal, gridTexture;
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, gridMaterial;
+let starTexture, skyColour;
 
-let rollOverMesh, rollOverMaterial;
+let flagRollOverGeo, flagRollOverMesh, flagRollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial;
 let nodeID;
 let outlineGeo, outlineMaterial;
 let gridGeo, gridMesh, gridSnapFactor;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished = new Boolean;
+
+let exporter;
 
 const collisionObjects = [];
 const nodes = [];
@@ -88,7 +92,7 @@ function init() {
     //#region renderer and scene setup
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xfaedca);
+    scene.background = skyColour;
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -99,32 +103,31 @@ function init() {
 
     document.body.appendChild(renderer.domElement);
 
-    loadTextures();
+    const exportButton = document.getElementById('export-scene');
+    exportButton.addEventListener('click', exportScene());
 
-    const axesHelper = new THREE.AxesHelper(10);
-    axesHelper.position.set(0,7,0);
-    scene.add(axesHelper);
+    loadTextures();
 
     //#endregion renderer and scene setup
 
     //#region lights
 
-    hemiLight = new THREE.HemisphereLight(0xfdfbd3 , 0x34ad61, 0.3);
+    hemiLight = new THREE.HemisphereLight(0xfdfbd3 , 0x34ad61, 0.4);
     scene.add(hemiLight);
 
     sunLight = new THREE.SpotLight(0xffa95c,1);
     sunLight.castShadow = true;
     sunLight.shadow.bias = -0.0001;
-    sunLight.shadow.mapSize.width = 1024 *2;
-    sunLight.shadow.mapSize.height = 1024*2;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 500;
 
     moonLight = new THREE.SpotLight(0xffffff,0.2);
     moonLight.castShadow = true;
     moonLight.shadow.bias = -0.0001;
-    moonLight.shadow.mapSize.width = 1024*2;
-    moonLight.shadow.mapSize.height = 1024*2;
+    moonLight.shadow.mapSize.width = 2048;
+    moonLight.shadow.mapSize.height = 2048;
     moonLight.shadow.camera.near = 0.5;
     moonLight.shadow.camera.far = 500;
 
@@ -148,8 +151,9 @@ function init() {
     gui = new GUI();    //create the gui
 
     gui.width = 300;
+    
 
-    world = {
+    world = {   //World variables
         plane: {            //Controls for the plane
             width: 100,     //change width
             height: 100,    //change height
@@ -179,7 +183,7 @@ function init() {
         },
         lights:{
             timeScale: 3,
-            orbitRadius: 100,
+            orbitRadius: 150,
             sunCycleActive: true,
             flatLighting: false
         },
@@ -422,7 +426,7 @@ function init() {
     planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
 
-    const lightFolder = gui.addFolder("Lights");
+    const lightFolder = gui.addFolder("Lighting");
     lightFolder.add(world.lights, "timeScale", 1,10, 1).name("Orbit speed");
     lightFolder.add(world.lights, "sunCycleActive").name("Sun cycle");
     lightFolder.add(world.lights, "flatLighting").name("Flat lighting").onChange(()=>{
@@ -528,11 +532,15 @@ function init() {
 
     //////roll-over sphere/////
 
-    const rollOverGeo = new THREE.SphereGeometry(1, 32, 32);
-    rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
-    rollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMaterial);
-    rollOverMesh.name = "Rollover";
-    scene.add(rollOverMesh);
+    
+    new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
+        flagRollOverGeo = gltf.scene;      //gltf model assigned to node object
+    })
+    
+    flagRollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
+    flagRollOverMesh = new THREE.Mesh(flagRollOverGeo, flagRollOverMaterial);
+    flagRollOverMesh.name = "Flag rollover";
+    scene.add(flagRollOverMesh);
 
     objectRolloverMaterial = new THREE.MeshBasicMaterial({opacity: 0.5, transparent: true});
 
@@ -587,6 +595,11 @@ function init() {
     areaHeightOffset = 0;
     isMoving = false;
     gridSnapFactor = 5;
+
+    clock = new THREE.Clock(true);
+    skyColour = new THREE.Color(0.980, 0.929, 0.792);
+
+    exporter = new GLTFExporter();
 
     currentObject = placableObjects.trees.tree1;
     updateCurrentObjectPath();
@@ -838,6 +851,7 @@ function loadTextures() {
 
     outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
 
+    starTexture = new THREE.TextureLoader().load("textures/stars.png");
 }
 
 function onWindowResize() {
@@ -861,11 +875,13 @@ function onPointerMove(event) {
         switch(currentMouseMode)    //Switch for mouse modes
         {
             case mouseMode.areaDef:
-                rollOverMesh.visible = true;
-                rollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
+                flagRollOverMesh.visible = true;
+                flagRollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
+                if(world.plane.snapToGrid) flagRollOverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
+
                 break;
             case mouseMode.objectPlace:
-                rollOverMesh.visible = false;
+                flagRollOverMesh.visible = false;
                 objectRolloverMesh.visible = true;
 
                 objectRolloverMesh.position.copy(intersect.point).add(intersect.face.normal);
@@ -884,7 +900,7 @@ function onPointerMove(event) {
         }
     }
     else{
-        if(rollOverMesh != null) rollOverMesh.visible = false;      //Removes the rollover mesh when the pointer isnt in a valid position
+        if(flagRollOverMesh != null) flagRollOverMesh.visible = false;      //Removes the rollover mesh when the pointer isnt in a valid position
         if(objectRolloverMesh != null) objectRolloverMesh.visible = false;
     }
 }
@@ -897,7 +913,6 @@ function onPointerDown(event) {
             
             switch (event.which){   ////Mouse button switch 
                 case 1: //Left click area definition
-
                 if (!outlineFinished) {
 
                     pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
@@ -912,10 +927,17 @@ function onPointerDown(event) {
     
                             new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
                                 node = gltf.scene;      //gltf model assigned to node object
-                                node.castShadow = true;
+                                node.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
+                                    if(n.isMesh){
+                                        n.castShadow = true;
+                                        n.receiveShadow = true;
+                                    }
+                                })
                                 node.scale.set(13,13,13);       //Increase scale
                                 node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                                if(world.plane.snapToGrid) node.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
                                 scene.add(node);        //Add the node to the scene
+                                //node.position.y -= 1;
     
                                 node.name = "node " + nodeID;   //Give the node a name with the id
                                 nodeID++;       //increment id 
@@ -1125,6 +1147,9 @@ function onDocumentKeyDown(event) {
         case 68: //d - move obj
         changeMouseMode(mouseMode.objectMove);
             break;
+        case 72:    //h - export scene
+            exportScene();
+            break;
     }
 
     objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
@@ -1138,23 +1163,51 @@ function onDocumentKeyUp(event) {
     }
 }
 
+let time;
+
 function render() {
 
     requestAnimationFrame(render);
     controls.update();
 
-    if(world.lights.sunCycleActive)
+    if(world.lights.sunCycleActive)     //If the sun cycle is active
     {
-        timestamp = Date.now() * world.lights.timeScale * 0.0001;
-        sunPosition.position.set(Math.cos(timestamp)*world.lights.orbitRadius,
-         Math.sin(timestamp) * world.lights.orbitRadius *1.5,
+        if(!clock.running) clock.start();
+        //timestamp = Date.now() * world.lights.timeScale * 0.0001;   //Get the timestamp according to scale from gui
+        timestamp = clock.getElapsedTime() * world.lights.timeScale *0.1;
+        sunPosition.position.set(Math.cos(timestamp)*world.lights.orbitRadius,  //Set sunPos
+         Math.sin(timestamp) * world.lights.orbitRadius *1.5,       //*1.5 offsets vertical orbit slightly, makes for a steeper orbit
          Math.sin(timestamp) * world.lights.orbitRadius);
-        
-        sunLight.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
+
+        sunLight.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);  //Set light and sphere to sunPos
         sunSphere.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
         
-        moonLight.position.set(-sunPosition.position.x, -sunPosition.position.y, -sunPosition.position.z);
+        moonLight.position.set(-sunPosition.position.x, -sunPosition.position.y, -sunPosition.position.z);  //Set moon light and sphere to -sunPos
         moonSphere.position.set(-sunPosition.position.x, -sunPosition.position.y, -sunPosition.position.z);
+
+        hemiLight.intensity = Math.max(0.3, Math.sin(timestamp));   //Changes the intensity of the hemisphere light with the position of the sunlight to simulate reflected light and soften shadows
+
+        let col;    //Temp variable for background colour
+        let val = Math.trunc(Math.max(0,Math.sin(timestamp)) * 100);    //Get col value for changing background colour with time
+        col = new THREE.Color("hsl(44, 83%, "+val+"%)")    //Set background colour
+        
+        if(val > 0){    //Change to sky colour
+            col.r = Math.min(col.r, skyColour.r);
+            col.g = Math.min(col.g, skyColour.g);
+            col.b = Math.min(col.b, skyColour.b);
+
+            col.r += 0.01;
+            col.g += 0.01;
+            col.b += 0.01;
+        }
+
+        if(val == 0) scene.background = starTexture;    //If night, set background tex to stars
+        
+        scene.background = col;
+    }
+    else {
+        if(clock.running) clock.stop();
+        hemiLight.intensity = 0.4; //If sun cycle isn't active, default to 0.4 intensity
     }
 
     renderer.render(scene, camera);
@@ -1248,7 +1301,9 @@ function loadRollover()
             if(child instanceof THREE.Mesh) { child.material = objectRolloverMaterial; } //Makes the object transparent
         });
         scene.add(objectRolloverMesh);
+        objectRolloverMesh.visible = false;
     });
+
 }
 
 function changeMouseMode(mode)
@@ -1257,23 +1312,54 @@ function changeMouseMode(mode)
     {
         case mouseMode.none:
             currentMouseMode = mouseMode.none;
-            rollOverMesh.visible = false;
+            flagRollOverMesh.visible = false;
             break;
         case mouseMode.areaDef:
             currentMouseMode = mouseMode.areaDef;
-            rollOverMesh.visible = true;
+            flagRollOverMesh.visible = true;
             break;
         case mouseMode.objectPlace:
             currentMouseMode = mouseMode.objectPlace;
-            rollOverMesh.visible = false;
+            flagRollOverMesh.visible = false;
             break;
         case mouseMode.objectRemove:
             currentMouseMode = mouseMode.objectRemove;
-            rollOverMesh.visible = false;
+            flagRollOverMesh.visible = false;
             break;
         case mouseMode.objectMove:
             currentMouseMode = mouseMode.objectMove;
-            rollOverMesh.visible = false;
+            flagRollOverMesh.visible = false;
             break;
     }
 }}
+
+function exportScene()
+{
+    console.log("Button press");
+
+    /*exporter.parse(scene, 
+        function(result){
+            saveArrayBuffer(result, 'Garden.glb')
+    },
+    {
+        binary: true
+    }
+    )*/
+}
+
+function save(blob, filename)
+{
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+}
+
+function saveString(text, filename)
+{
+    save(new Blob( [text], { type: 'text/plain' } ), filename);
+}
+
+function saveArrayBuffer(buffer, filename)
+{
+    save( new Blob( [ buffer ], {type: 'application/actec-stream'}), filename);
+}
