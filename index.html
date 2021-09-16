@@ -2,16 +2,28 @@
 <html lang="en">
 
 <head>
+    <script src="https://kit.fontawesome.com/f59c2f711b.js" crossorigin="anonymous"></script>
     <meta charset="UTF-8" />
     <title>Garden Planner</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Glory:wght@600&family=Work+Sans:ital,wght@1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Glory:wght@600&family=Work+Sans:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
     <style>
         body {
             margin: 0;
             -webkit-font-smoothing: antialiased;
+        }
+
+        input[type=text], select{
+            width: 70%;
+            padding: 4px 2px;
+            margin: 8px 0;
+            display: inline-block;
+            border: 1px solid rgba(204, 204, 204, 0.171);
+            border-radius: 4px;
+            box-sizing: border-box;
+            background-color: rgba(0, 0, 0, 0.301);
         }
 
         .font-glory{
@@ -26,23 +38,33 @@
 
 <body>
     <div id="app">
-        <div class="absolute text-black text-opacity-75 text-justify border px-2 py-1 rounded-lg fill-current border-transparent 
-        bg-green-500 bg-opacity-25 " style="top: 2%; left: 2%">
-            <h1 class="font-work-sans">Garden Planner - <a href "https://www.adam-stephenson.co.uk/"> Adam Stephenson </a></h1>
+        <div id="box" class="absolute text-black text-opacity-75 text-justify 
+        border px-2 py-1 rounded-lg fill-current border-transparent 
+        bg-white bg-opacity-25 " style="top: 2%; left: 2%">
+            <h1 class="font-work-sans"> <i>Garden Planner - <a href = "https://www.adam-stephenson.co.uk/" target="_blank"> Adam Stephenson </i>  </a></h1>
             <p class="font-glory text-sm">
                 Right mouse - rotate <br>
                 Middle mouse - pan <br>
                 Left mouse - selected tool <br>
                 Arrow keys - rotate and scale
             </p>
+            <div>
+                <i class="fas fa-tools"></i>
+                <p id="current-tool" class="font-work-sans text-sm" style="display: inline-block"></p>
+            </div>
+            <div>
+                <i class="fas fa-cube"></i>
+                <p id="current-object" class="font-work-sans text-sm" style="display: inline-block"></p>
+            </div>
+            
             <button id="export-scene" 
             class="font-work-sans text-m 
             border px-2 py-1 rounded-lg border-black
-            hover:bg-green-500"
-            >
+            hover:bg-green-500 ">
             Export scene
-        </button>
-        </div>
+            </button>
+            <p id="export-confirm" class="font-work-sans animate-bounce" style="display: inline-block"> <i>Export successful!</i></p>
+            <br> <input type="text" id="filename" placeholder="File name..."> 
     </div>
     <script type="module" src="index.js"></script>
     
