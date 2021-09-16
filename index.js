@@ -8,7 +8,7 @@ import { GLTFExporter } from "https://unpkg.com/three@0.126.1/examples/jsm/expor
 
 //#region declarations
 let camera, listener, scene, renderer, controls, gui, world;
-let hemiLight, sunLight, moonLight;
+let hemiLight, sunLight, moonLight, pointLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
 let planeMesh;
 let pointer, raycaster;
@@ -26,13 +26,14 @@ let gridGeo, gridMesh, gridSnapFactor;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished = new Boolean;
 
-let exporter;
+let exporter, link;
 
 const collisionObjects = [];
 const nodes = [];
 const areas = [];
 const outlinePoints = [];
 const placedObjects = [];
+const exportableObjects = [];
 
 const areaTypes = { grass: 'Grass', soil: 'Soil', gravel: 'Gravel', stone: 'Stone' };
 
@@ -104,7 +105,7 @@ function init() {
     document.body.appendChild(renderer.domElement);
 
     const exportButton = document.getElementById('export-scene');
-    exportButton.addEventListener('click', exportScene());
+    //exportButton.addEventListener('click', exportScene());
 
     loadTextures();
 
@@ -114,6 +115,8 @@ function init() {
 
     hemiLight = new THREE.HemisphereLight(0xfdfbd3 , 0x34ad61, 0.4);
     scene.add(hemiLight);
+
+    pointLight = new THREE.PointLight(0xffa95c, 0.6); //Dir light for when flat lighting is checked
 
     sunLight = new THREE.SpotLight(0xffa95c,1);
     sunLight.castShadow = true;
@@ -437,6 +440,7 @@ function init() {
 
         if(world.lights.flatLighting){
             hemiLight.intensity = 0.8;
+            scene.background = skyColour;
         }
         else hemiLight.intensity = 0.3;
     } );
@@ -520,7 +524,7 @@ function init() {
     controls.screenSpacePanning = false;
     controls.minDistance = 10;      //Min and max zoom distances
     controls.maxDistance = 1500;
-    //controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
+    controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
 
     controls.mouseButtons = {
         MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
@@ -600,6 +604,9 @@ function init() {
     skyColour = new THREE.Color(0.980, 0.929, 0.792);
 
     exporter = new GLTFExporter();
+    link = document.createElement('a');
+    link.style.display = 'none';
+    document.body.appendChild(link);
 
     currentObject = placableObjects.trees.tree1;
     updateCurrentObjectPath();
@@ -750,10 +757,8 @@ function loadTextures() {
     grassNormal.wrapT = THREE.RepeatWrapping;
     grassNormal.repeat.set(4, 4);
 
-    grassMaterial = new THREE.MeshPhongMaterial({
+    grassMaterial = new THREE.MeshStandardMaterial({
         color: 0xdddddd,
-        specular: 0x222222,
-        shininess: 5,
         map: grassTexture,
         normalMap: grassNormal,
         side: THREE.DoubleSide
@@ -769,10 +774,8 @@ function loadTextures() {
     soilNormal.wrapT = THREE.RepeatWrapping;
     soilNormal.repeat.set(4, 4);
 
-    soilMaterial = new THREE.MeshPhongMaterial({
+    soilMaterial = new THREE.MeshStandardMaterial({
         color: 0xdddddd,
-        specular: 0x222222,
-        shininess: 5,
         map: soilTexture,
         normalMap: soilNormal,
         side: THREE.DoubleSide
@@ -788,10 +791,8 @@ function loadTextures() {
     gravelNormal.wrapT = THREE.RepeatWrapping;
     gravelNormal.repeat.set(4, 4);
 
-    gravelMaterial = new THREE.MeshPhongMaterial({
+    gravelMaterial = new THREE.MeshStandardMaterial({
         color: 0xdddddd,
-        specular: 0x222222,
-        shininess: 5,
         map: gravelTexture,
         normalMap: gravelNormal,
         side: THREE.DoubleSide
@@ -807,10 +808,8 @@ function loadTextures() {
     stoneNormal.wrapT = THREE.RepeatWrapping;
     stoneNormal.repeat.set(4, 4);
 
-    stoneMaterial = new THREE.MeshPhongMaterial({
+    stoneMaterial = new THREE.MeshStandardMaterial({
         color: 0xdddddd,
-        specular: 0x222222,
-        shininess: 5,
         map: stoneTexture,
         normalMap: stoneNormal,
         side: THREE.DoubleSide
@@ -821,7 +820,7 @@ function loadTextures() {
     gridTexture.wrapT = THREE.RepeatWrapping;
     gridTexture.repeat.set(20, 20);
 
-    gridMaterial = new THREE.MeshPhongMaterial({
+    gridMaterial = new THREE.MeshStandardMaterial({
         color: 0xdddddd,
         map: gridTexture,
         transparent: true
@@ -1147,7 +1146,7 @@ function onDocumentKeyDown(event) {
         case 68: //d - move obj
         changeMouseMode(mouseMode.objectMove);
             break;
-        case 72:    //h - export scene
+        case 85:    //u - export scene
             exportScene();
             break;
     }
@@ -1163,14 +1162,12 @@ function onDocumentKeyUp(event) {
     }
 }
 
-let time;
-
 function render() {
 
     requestAnimationFrame(render);
     controls.update();
 
-    if(world.lights.sunCycleActive)     //If the sun cycle is active
+    if(world.lights.sunCycleActive && !world.lights.flatLighting)     //If the sun cycle is active
     {
         if(!clock.running) clock.start();
         //timestamp = Date.now() * world.lights.timeScale * 0.0001;   //Get the timestamp according to scale from gui
@@ -1337,14 +1334,27 @@ function exportScene()
 {
     console.log("Button press");
 
-    /*exporter.parse(scene, 
-        function(result){
-            saveArrayBuffer(result, 'Garden.glb')
-    },
-    {
-        binary: true
-    }
-    )*/
+    hemiLight.visible = false;
+    flagRollOverMesh.visible = false;
+    objectRolloverMesh.visible = false;
+    sunSphere.visible = false;
+    moonSphere.visible = false;
+
+    exporter.parse( scene, function ( gltf ) {
+        if(gltf instanceof ArrayBuffer){
+            saveArrayBuffer(gltf, 'scene.glb');
+        }else{
+            const output = JSON.stringify( gltf, null, 2);
+            console.log(output);
+            saveString(output, 'Garden.gltf');
+        }
+    } )
+
+    hemiLight.visible = true;
+    flagRollOverMesh.visible = true;
+    objectRolloverMesh.visible = true;
+    sunSphere.visible = true;
+    moonSphere.visible = true;
 }
 
 function save(blob, filename)
@@ -1356,10 +1366,10 @@ function save(blob, filename)
 
 function saveString(text, filename)
 {
-    save(new Blob( [text], { type: 'text/plain' } ), filename);
+    save(new Blob ( [text], { type: 'text/plain' } ), filename );
 }
 
 function saveArrayBuffer(buffer, filename)
 {
-    save( new Blob( [ buffer ], {type: 'application/actec-stream'}), filename);
+    save( new Blob ( [ buffer ], { type: 'application/octet-stream' } ), filename );
 }
