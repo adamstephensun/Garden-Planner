@@ -62,20 +62,36 @@
             </p> <br>
             <input type="text" id="filename" placeholder="File name..."> 
             <button id="help-button"
-            class="border px-2 py-1 rounded-lg border-black hover:bg-green-500 object-right-bottom">
+            class="absolute bottom-3 right-2 border px-2 py-1 rounded-lg border-black hover:bg-green-500 object-right-bottom">
                 <i class="fas fa-question text-xl"></i>
             </button>
         </div>
 
         <div id="help"
-        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50"
-        style="top: 50%; transform: translate(-50%,-50%); left:50%" >
-            <h1 class="font-work-sans text-lg text-center">
-                Help
+        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 w-1/2"
+        style="bottom: 2%;right:2%" >
+            <h1 class="font-work-sans text-lg">
+                <i>Help</i>
             </h1>
-            <p class="font-glory">
-                Welcome to garden planner!
+            <h2 id="help-h2" class="font-work-sans">
+                Plane
+            </h2>
+            <p id="help-p" class="font-glory text-sm">
+                Welcome to garden planner! Use this tool to plan your dream garden! <br>
+                Use the menu on the top right of the screen to make changes. <br>
+                Start by altering the plane by changing the size, terrain type, and grid snapping. Click finalise to finish editing the plane. <br><br>
             </p>
+
+            <button id="help-back"
+            class="absolute bottom-2 right-12 border px-2 py-1 rounded-lg fill-current border-transparent bg-black bg-opacity-50 max-w-lg">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+
+            <button id="help-forward"
+            class="absolute bottom-2 right-2 border px-2 py-1 rounded-lg fill-current border-transparent bg-black bg-opacity-50 max-w-lg">
+                <i class="fas fa-arrow-right"></i>
+            </button>
+
         </div>
 
         <div id="controls-box" 
