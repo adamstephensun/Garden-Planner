@@ -18,7 +18,7 @@ let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNor
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, gridMaterial;
 let starTexture, skyColour;
 
-let flagRollOverGeo, flagRollOverMesh, flagRollOverMaterial;
+let flagRollOverMesh, flagRollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial;
 let nodeID;
 let outlineGeo, outlineMaterial;
@@ -27,8 +27,10 @@ let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished = new Boolean;
 let exportSuccess = new Boolean;
 let canInteract = new Boolean;
+let helpActive = new Boolean;
 
-let exporter, link, confirmExport, confirmExportTimer, filenameInput, box, box2;
+let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
+let helpButton, helpBox; 
 
 const collisionObjects = [];
 const nodes = [];
@@ -522,31 +524,13 @@ function init() {
     controls.screenSpacePanning = false;
     controls.minDistance = 10;      //Min and max zoom distances
     controls.maxDistance = 1500;
-    //controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
+    controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
 
     controls.mouseButtons = {
         MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
         RIGHT: THREE.MOUSE.ROTATE
     }
     //#endregion camera controls
-
-    //#region Rollovers
-
-    //////roll-over sphere/////
-
-    
-    new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
-        flagRollOverGeo = gltf.scene;      //gltf model assigned to node object
-    })
-    
-    flagRollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
-    flagRollOverMesh = new THREE.Mesh(flagRollOverGeo, flagRollOverMaterial);
-    flagRollOverMesh.name = "Flag rollover";
-    scene.add(flagRollOverMesh);
-
-    objectRolloverMaterial = new THREE.MeshBasicMaterial({opacity: 0.5, transparent: true});
-
-    //#endregion Rollovers
 
     //#region raycast
 
@@ -600,55 +584,48 @@ function init() {
     confirmExportTimer = 0;
     canInteract = true;
 
+    exporter = new GLTFExporter();
+    exportSuccess = false;  //Flag for confim animation
+
     clock = new THREE.Clock(true);  //Clock for animation
     skyColour = new THREE.Color(0.980, 0.929, 0.792);   //Default sky colour, light yellow
 
+    loadAudio();
+    loadFlagRollover();
+    
     currentObject = placableObjects.trees.tree1;    //Default object selected
     updateCurrentObjectPath();                      //Update object filepath
     changeMouseMode(mouseMode.none);                //Set mouse mode to none
     currentObjectScale = 10;            //Defult scale and rotation
     currentObjectRotation = 0;
     
-    loadAudio();
-    loadRollover();
+    loadObjectRollover();
 
     //#endregion assignments and loaders
 
     //#region HTML
 
-    exporter = new GLTFExporter();      //Exporter for GLTF
     link = document.createElement('a'); //Code for gltf exporter
     link.style.display = "none";
     document.body.appendChild(link);
-    exportSuccess = false;
+    
 
     document.getElementById('export-scene').addEventListener('click', function(){exportScene();})
     confirmExport = document.getElementById("export-confirm");
     confirmExport.style.visibility = "hidden";
     
     filenameInput = document.getElementById('filename');
+    infoBox = document.getElementById("info-box");
+    helpButton = document.getElementById("help-button").addEventListener('click', function(){toggleHelp();});
+    helpBox = document.getElementById("help");
 
-    box = document.getElementById("box");
-    box2 = document.getElementById("box2");
+    toggleHelp();
     
-    box.addEventListener('mouseenter', function(){
-        canInteract = false;
-        console.log(canInteract);
-        objectRolloverMesh.visible = false;
-    })
-    box.addEventListener('mouseleave', function(){
-        canInteract = true;
-        console.log(canInteract);
-    })
+    infoBox.addEventListener('mouseenter', function(){ canInteract = false; })
+    infoBox.addEventListener('mouseleave', function(){ canInteract = true; })
 
-    gui.domElement.addEventListener('mouseenter', function(){
-        console.log("Enter gui");
-        canInteract = false;
-    })
-    gui.domElement.addEventListener('mouseleave', function(){
-        console.log("Leave gui");
-        canInteract = true;
-    })
+    gui.domElement.addEventListener('mouseenter', function(){ canInteract = false; })
+    gui.domElement.addEventListener('mouseleave', function(){ canInteract = true; })
 
     //#endregion HTML
 
@@ -752,7 +729,7 @@ function updateCurrentObjectPath(){
     document.getElementById("current-object").innerHTML = " = "+currentObject;
     changeMouseMode(mouseMode.objectPlace);
     console.log("Current object updated to: " + currentObject);
-    loadRollover();
+    loadObjectRollover();
 
     currentObjectScale = 10;
     currentObjectRotation = 0;
@@ -885,6 +862,9 @@ function loadTextures() {
     outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
 
     starTexture = new THREE.TextureLoader().load("textures/stars.png");
+
+    objectRolloverMaterial = new THREE.MeshBasicMaterial({ opacity: 0.5, transparent: true});
+    flagRollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
 }
 
 function onWindowResize() {
@@ -905,14 +885,12 @@ function onPointerMove(event) {
         if (intersects.length > 0) {
     
             const intersect = intersects[0];    //intersects[] contains the intersection data
-    
             switch(currentMouseMode)    //Switch for mouse modes
             {
                 case mouseMode.areaDef:
                     flagRollOverMesh.visible = true;
                     flagRollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
                     if(world.plane.snapToGrid) flagRollOverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
-    
                     break;
                 case mouseMode.objectPlace:
                     flagRollOverMesh.visible = false;
@@ -1165,31 +1143,37 @@ function onDocumentKeyDown(event) {
             if(currentObjectRotation > 360 ) currentObjectRotation = 0;
             console.log("Rotation changed to: " + currentObjectRotation);
             break; 
+    }
 
-        /////Macros/////
-        case 81: //q - new area
-            changeMouseMode(mouseMode.areaDef);
-            break;
-        case 87: //w - continue area
-            break;
-        case 69: //e - finish area
-            finalOutline();
-            break;
-        case 82: //r - clear areas
-            clearAreas();
-            break;
-        case 65: //a - place obj
-            changeMouseMode(mouseMode.objectPlace);
-            break;
-        case 83: //s - remove obj 
-            changeMouseMode(mouseMode.objectRemove);
-            break;
-        case 68: //d - move obj
-        changeMouseMode(mouseMode.objectMove);
-            break;
-        case 85:    //u - export scene
-            exportScene();
-            break;
+    if(filenameInput != document.activeElement)
+    {
+        switch(event.keyCode)
+        {
+            /////Macros/////
+            case 81: //q - new area
+                changeMouseMode(mouseMode.areaDef);
+                break;
+            case 87: //w - continue area
+                break;
+            case 69: //e - finish area
+                finalOutline();
+                break;
+            case 82: //r - clear areas
+                clearAreas();
+                break;
+            case 65: //a - place obj
+                changeMouseMode(mouseMode.objectPlace);
+                break;
+            case 83: //s - remove obj 
+                changeMouseMode(mouseMode.objectRemove);
+                break;
+            case 68: //d - move obj
+                changeMouseMode(mouseMode.objectMove);
+                break;
+            case 85:    //u - export scene
+                exportScene();
+                break;
+        }
     }
 
     objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
@@ -1207,6 +1191,8 @@ function render() {
 
     requestAnimationFrame(render);
     controls.update();
+
+    if(filenameInput == document.activeElement) console.log("file active");
 
     if(world.lights.sunCycleActive && !world.lights.flatLighting)     //If the sun cycle is active
     {
@@ -1348,7 +1334,7 @@ function clearAreas(){
     areaID = 0;
 }
 
-function loadRollover()
+function loadObjectRollover()
 {
     new GLTFLoader().load(currentObjectPath, function(gltf){
         objectRolloverMesh = gltf.scene;
@@ -1358,7 +1344,17 @@ function loadRollover()
         scene.add(objectRolloverMesh);
         objectRolloverMesh.visible = false;
     });
+    console.log("obj: "+objectRolloverMesh);
+}
 
+function loadFlagRollover(){
+
+    const flagRolloverGeo = new THREE.SphereGeometry(1,32,16);
+
+    flagRollOverMesh = new THREE.Mesh(flagRolloverGeo, flagRollOverMaterial);
+    scene.add(flagRollOverMesh);
+    flagRollOverMesh.name = "FlagRollover";
+    flagRollOverMesh.visible = false;
 }
 
 function changeMouseMode(mode)
@@ -1438,4 +1434,12 @@ function saveString(text, filename)
 function saveArrayBuffer(buffer, filename)
 {
     save( new Blob ( [ buffer ], { type: 'application/octet-stream' } ), filename );
+}
+
+function toggleHelp(){
+
+    helpActive = !helpActive;
+
+    if(helpActive) helpBox.style.visibility = "visible";
+    else helpBox.style.visibility = "hidden";
 }

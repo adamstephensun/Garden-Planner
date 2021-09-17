@@ -38,16 +38,10 @@
 
 <body>
     <div id="app">
-        <div id="box" class="absolute text-black text-opacity-75 text-justify 
-        border px-2 py-1 rounded-lg fill-current border-transparent 
-        bg-white bg-opacity-25 " style="top: 2%; left: 2%">
-            <h1 class="font-work-sans"> <i>Garden Planner - <a href = "https://www.adam-stephenson.co.uk/" target="_blank"> Adam Stephenson </i>  </a></h1>
-            <p class="font-glory text-sm">
-                Right mouse - rotate <br>
-                Middle mouse - pan <br>
-                Left mouse - selected tool <br>
-                Arrow keys - rotate and scale
-            </p>
+        <div id="info-box"
+        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50" 
+        style="top: 2%; left: 2%">
+            <h1 class="font-work-sans"> <i>Garden Planner - <a href = "https://www.adam-stephenson.co.uk/" target="_blank"> Adam Stephenson </i> </a></h1>
             <div>
                 <i class="fas fa-tools"></i>
                 <p id="current-tool" class="font-work-sans text-sm" style="display: inline-block"></p>
@@ -58,13 +52,58 @@
             </div>
             
             <button id="export-scene" 
-            class="font-work-sans text-m 
-            border px-2 py-1 rounded-lg border-black
-            hover:bg-green-500 ">
+            class="font-work-sans text-m border px-2 py-1 rounded-lg border-black hover:bg-green-500 ">
             Export scene
             </button>
-            <p id="export-confirm" class="font-work-sans animate-bounce" style="display: inline-block"> <i>Export successful!</i></p>
-            <br> <input type="text" id="filename" placeholder="File name..."> 
+            <p  id="export-confirm" 
+            class="font-work-sans animate-bounce" 
+            style="display: inline-block"> 
+                <i>Export successful!</i>
+            </p> <br>
+            <input type="text" id="filename" placeholder="File name..."> 
+            <button id="help-button"
+            class="border px-2 py-1 rounded-lg border-black hover:bg-green-500 object-right-bottom">
+                <i class="fas fa-question text-xl"></i>
+            </button>
+        </div>
+
+        <div id="help"
+        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50"
+        style="top: 50%; transform: translate(-50%,-50%); left:50%" >
+            <h1 class="font-work-sans text-lg text-center">
+                Help
+            </h1>
+            <p class="font-glory">
+                Welcome to garden planner!
+            </p>
+        </div>
+
+        <div id="controls-box" 
+        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50"
+        style = "bottom: 2%; left: 15%">
+            <p class = "font-glory text-sm">
+                Right mouse - rotate<br>
+                Middle mouse - pan<br>
+                Left mouse - selected tool<br>
+                Arrow keys - rotate and scale
+            </p>
+        </div>
+        <div id="controls-box-2"
+        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50"
+        style = "bottom: 2%; left: 2%">
+            <h1 class="font-work-sans"> <i>Controls</i></h1>
+            <p class = "font-glory text-sm">
+            Q - new area <br>
+            W - continue area <br>
+            E - finish area <br>
+            R - clear areas <br>
+            A - place object <br>
+            S - remove object <br>
+            D - move object <br>
+            </p>
+        </div>
+            
+
     </div>
     <script type="module" src="index.js"></script>
     
