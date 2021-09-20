@@ -33,7 +33,7 @@ let velocity, direction;
 
 let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
-let toggleCamButton, controlsBox1, controlsBox2, crosshair;
+let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls;
 
 const collisionObjects = [];
 const nodes = [];
@@ -554,10 +554,11 @@ function init() {
         isFirstPerson = !isFirstPerson;
         changeCamera(isFirstPerson);
     });
+
+    fpControls = document.getElementById("controls-fp");
     
     //////Crosshair//////
     crosshair = document.getElementById("crosshair");
-    //crosshair.style.visibility = "hidden";
 
     /////disabling interaction when hovering on UI elements
     infoBox = document.getElementById("info-box");
@@ -575,6 +576,9 @@ function init() {
 
     toggleCamButton.addEventListener('mouseenter', function(){ canInteract = false; })    //Cam toggle button
     toggleCamButton.addEventListener('mouseleave', function(){canInteract = true;})
+
+    fpControls.addEventListener('mouseenter', function(){ canInteract = false; })    //First person controls
+    fpControls.addEventListener('mouseleave', function(){canInteract = true;})
 
     gui.domElement.addEventListener('mouseenter', function(){ canInteract = false; })   //Dat gui
     gui.domElement.addEventListener('mouseleave', function(){ canInteract = true; })
@@ -609,6 +613,7 @@ function changeCamera(fp){
         }
 
         document.getElementById("crosshair").style.visibility = "hidden";
+        document.getElementById("controls-fp").style.visibility = "hidden";
     }
     else{   //FP controls
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight,1,1000);
@@ -617,6 +622,7 @@ function changeCamera(fp){
         controls = new PointerLockControls(camera, document.body);
         scene.add(controls.getObject());
         document.getElementById("crosshair").style.visibility = "visible";
+        document.getElementById("controls-fp").style.visibility = "visible";
     }
 
     document.activeElement.blur();  //Disables the button as active element to avoid toggleing cam when pressing space
@@ -1225,7 +1231,7 @@ function onPointerDown(event) {
             }
     }
     
-    if(isFirstPerson) controls.lock();
+    if(isFirstPerson && canInteract) controls.lock();
 }
 
 function onDocumentKeyDown(event) {
@@ -1275,6 +1281,10 @@ function onDocumentKeyDown(event) {
                 break;
             case 76: //l - move obj
                 changeMouseMode(mouseMode.objectMove);
+                break;
+            case 67: //c - toggle cam
+                isFirstPerson = !isFirstPerson;
+                changeCamera(isFirstPerson);
                 break;
         }
     }
@@ -1431,6 +1441,10 @@ function render() {
             confirmExportTimer = 0;
         }
     }
+
+    let start = Date.now();
+
+    
 
     renderer.render(scene, camera);
 }
