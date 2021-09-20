@@ -31,9 +31,12 @@ let prevTime, fpRaycaster;
 let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = new Boolean;
 let velocity, direction;
 
-let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
+let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox, timeBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
 let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls;
+
+let timer, sunStartPos, days;
+let dayFlag = new Boolean;
 
 const collisionObjects = [];
 const nodes = [];
@@ -87,6 +90,7 @@ const mouseMode = {
 }
 
 let currentMouseMode = mouseMode.areaDef;
+
 
 let currentObject, currentObjectPath, isMoving, currentObjectScale, currentObjectRotation;
 
@@ -500,6 +504,9 @@ function init() {
 
     clock = new THREE.Clock(true);  //Clock for animation
     skyColour = new THREE.Color(0.980, 0.929, 0.792);   //Default sky colour, light yellow
+    dayFlag = false;
+    sunStartPos = new THREE.Vector3();
+    days = 0;
     
     changeCamera(isFirstPerson);
     loadAudio();
@@ -548,6 +555,9 @@ function init() {
     controlsBox1 = document.getElementById("controls-box");
     controlsBox2 = document.getElementById("controls-box-2");
 
+    //////Time box//////
+    timeBox = document.getElementById("time-box");
+
     //////Toggle cam button////
     toggleCamButton = document.getElementById("toggle-cam");
     toggleCamButton.addEventListener('click', function(){
@@ -586,6 +596,17 @@ function init() {
 
     //#endregion HTML
 
+    initTimer();
+}
+
+function initTimer()
+{
+    console.log("timer initialised");
+    timer = new easytimer.Timer();
+    timer.start({precision: 'secondTenths'});
+    timer.addEventListener('secondsUpdated', function(){
+        document.getElementById("time-seconds").innerHTML =timer.getTimeValues().toString();
+    })
 }
 
 function changeCamera(fp){
@@ -1337,6 +1358,7 @@ function onDocumentKeyUp(event) {
 function render() {
 
     requestAnimationFrame(render);
+
     if(!isFirstPerson) controls.update();   //Controls.update() is only for orbit controls
     else{       //First person code
         const time = performance.now();
@@ -1385,14 +1407,24 @@ function render() {
 
     if(world.lights.sunCycleActive && !world.lights.flatLighting)     //If the sun cycle is active
     {
+        
         if(!clock.running) clock.start();
         timestamp = clock.getElapsedTime() * world.lights.timeScale *0.1;
+        //console.log("Time: "+timestamp);
+
         sunPosition.position.set(Math.cos(timestamp)*world.lights.orbitRadius,  //Set sunPos
          Math.sin(timestamp) * world.lights.orbitRadius *1.5,       //*1.5 offsets vertical orbit slightly, makes for a steeper orbit
          Math.sin(timestamp) * world.lights.orbitRadius);
 
+        console.log(sunPosition.position.y.toFixed(0));
+
+        if(sunPosition.position.y.toFixed(0) == -225){
+            incrementDays(clock.getElapsedTime());
+        } 
+
         sunLight.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);  //Set light and sphere to sunPos
         sunSphere.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
+
         
         moonLight.position.set(-sunPosition.position.x, -sunPosition.position.y, -sunPosition.position.z);  //Set moon light and sphere to -sunPos
         moonSphere.position.set(-sunPosition.position.x, -sunPosition.position.y, -sunPosition.position.z);
@@ -1444,11 +1476,18 @@ function render() {
 
     let start = Date.now();
 
-    
-
     renderer.render(scene, camera);
 }
 render();
+
+function incrementDays(timestamp){
+    if(timestamp == clock.getElapsedTime()){
+        console.log(timestamp + "----"+clock.getElapsedTime());
+        days++;
+        console.log("Day added: " + days)
+    }
+
+}
 
 function drawLine() {
     scene.remove(scene.getObjectByName("outline")); //Deletes the old line object for efficiency
