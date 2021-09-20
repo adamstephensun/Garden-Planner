@@ -486,7 +486,7 @@ function init() {
     canInteract = true;         //Bool to determine if the player can interact with the js scene
 
     prevTime = performance.now();       //Used for movement
-    fpRaycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3(0,-1,0), 0,10);
+    fpRaycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3(0,-1,0), 0,0.1);  //Groundcheck
     velocity = new THREE.Vector3(0,0,0);
     direction = new THREE.Vector3(0,0,0);
     isFirstPerson = false;
@@ -618,6 +618,8 @@ function changeCamera(fp){
         scene.add(controls.getObject());
         document.getElementById("crosshair").style.visibility = "visible";
     }
+
+    document.activeElement.blur();  //Disables the button as active element to avoid toggleing cam when pressing space
 }
 
 function addRestOfGUI(){
@@ -1023,8 +1025,6 @@ function onPointerMove(event) {
 function onPointerDown(event) {
 
     if(canInteract){
-        if(isFirstPerson && controls.isLocked)
-        {
             switch(currentMouseMode)    //Master switch for mouse mode
             {
                 case mouseMode.areaDef:         //Area definition mode
@@ -1086,11 +1086,12 @@ function onPointerDown(event) {
                 switch (event.which){   ////Mouse button switch 
                     case 1: //Left click object place
 
-                        pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                        if(isFirstPerson) raycaster.setFromCamera(new THREE.Vector2(), camera);
-                        else raycaster.setFromCamera(pointer, camera);
+                        pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);   //Pointer is the mouse position on the screen as a vec2
+                        
+                        raycaster.setFromCamera(pointer, camera);
+                        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+
                         const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
-        
                         if (intersects.length > 0) {    //If ray intersects with something
                             
                             const intersect = intersects[0];
@@ -1222,7 +1223,6 @@ function onPointerDown(event) {
         
                     break;
             }
-        }
     }
     
     if(isFirstPerson) controls.lock();
@@ -1366,8 +1366,6 @@ function render() {
                 controls.getObject().position.y = 10;
                 canJump = true;
             }
-
-            console.log(moveForward);
 
             if(controls.getObject().position.y < -100) controls.getObject().position = new THREE.Vector3(0,10,0);
         }
