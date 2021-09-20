@@ -27,8 +27,10 @@ let gridGeo, gridMesh, gridSnapFactor;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished, exportSuccess, canInteract, helpActive = new Boolean;
 
+let prevTime, fpRaycaster;
 let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = false;
-let velocity, direction = new THREE.Vector3();
+let velocity = new THREE.Vector3();
+let direction = new THREE.Vector3();
 
 let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
@@ -483,17 +485,19 @@ function init() {
     confirmExportTimer = 0;     //Timer for export confirm html message
     canInteract = true;         //Bool to determine if the player can interact with the js scene
 
-    isFirstPerson = false;
+    isFirstPerson = true;
+    prevTime = performance.now();
+    fpRaycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3(0,-1,0), 0,10);
 
     exporter = new GLTFExporter();
     exportSuccess = false;  //Flag for confim animation
 
     clock = new THREE.Clock(true);  //Clock for animation
     skyColour = new THREE.Color(0.980, 0.929, 0.792);   //Default sky colour, light yellow
-
+    
+    changeCamera(isFirstPerson);
     loadAudio();
     loadFlagRollover();
-    changeCamera(!isFirstPerson);
     
     currentObject = placableObjects.trees.tree1;    //Default object selected
     updateCurrentObjectPath();                      //Update object filepath
@@ -576,6 +580,7 @@ function changeCamera(fp){
         camera.position.y = 10;
 
         controls = new PointerLockControls(camera, document.body);
+        //controls.lock();
     }
 }
 
@@ -793,7 +798,7 @@ function updateCurrentObjectPath(){
 
 function loadAudio(){
     listener = new THREE.AudioListener();
-    camera.add(listener);
+    //camera.add(listener);
 
     spawnSound = new THREE.Audio(listener);
     spawnSound.name = "SpawnListener";
@@ -977,6 +982,8 @@ function onPointerMove(event) {
 }
 
 function onPointerDown(event) {
+
+    if(isFirstPerson) controls.lock();
 
     if(canInteract){
         switch(currentMouseMode)    //Master switch for mouse mode
@@ -1278,8 +1285,53 @@ function onDocumentKeyUp(event) {
 function render() {
 
     requestAnimationFrame(render);
-    console.log(isFirstPerson);
-    if(!isFirstPerson) controls.update();
+    if(!isFirstPerson) controls.update();   //Controls.update() is only for orbit controls
+    else{       //First person code
+        const time = performance.now();
+        
+        if(controls.isLocked)
+        {
+            fpRaycaster.ray.origin.copy(controls.getObject().position);
+            fpRaycaster.ray.origin.y -= 10;
+
+            const intersections = fpRaycaster.intersectObjects(collisionObjects);
+            const onObject = intersections.length > 0;
+
+            const delta = (time - prevTime)/1000;
+
+            velocity.x -= velocity.x  * delta;
+            velocity.z -= velocity.z  * delta;
+            velocity.y -= 9.8 * 100 * delta;    //100 = mass
+    
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+    
+            if(moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
+            if(moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+    
+            if(onObject){
+                velocity.y = Math.max(0, velocity.y);
+                canJump = true;
+            }
+
+            controls.moveRight(-velocity.x *delta);
+            controls.moveForward(-velocity.z * delta);
+            controls.getObject().position.y += (velocity.y * delta);
+
+            if(controls.getObject().position.y < 10){
+                velocity.y = 0;
+                controls.getObject().position.y =10;
+                canJump = true;
+            }
+
+            console.log(controls.getObject().position);
+
+            if(controls.getObject().position.y < -100) controls.getObject().position = new THREE.Vector3(0,10,0);
+        }
+
+        prevTime = time;
+    }
 
     if(world.lights.sunCycleActive && !world.lights.flatLighting)     //If the sun cycle is active
     {
