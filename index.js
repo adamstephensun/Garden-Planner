@@ -5,10 +5,11 @@ import { ConvexGeometry } from "https://unpkg.com/three@0.126.1/examples/jsm/geo
 import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.module.js";
 import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js";
 import { GLTFExporter } from "https://unpkg.com/three@0.126.1/examples/jsm/exporters/GLTFExporter.js";
+import { PointerLockControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/PointerLockControls.js"; 
 
 //#region declarations
 let camera, listener, scene, renderer, controls, gui, world;
-let hemiLight, sunLight, moonLight, pointLight;
+let hemiLight, sunLight, moonLight, pointLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
 let planeMesh;
 let pointer, raycaster;
@@ -24,10 +25,10 @@ let nodeID;
 let outlineGeo, outlineMaterial;
 let gridGeo, gridMesh, gridSnapFactor;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
-let outlineFinished = new Boolean;
-let exportSuccess = new Boolean;
-let canInteract = new Boolean;
-let helpActive = new Boolean;
+let outlineFinished, exportSuccess, canInteract, helpActive = new Boolean;
+
+let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = false;
+let velocity, direction = new THREE.Vector3();
 
 let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
@@ -97,6 +98,7 @@ function init() {
 
     scene = new THREE.Scene();
     scene.background = skyColour;
+    scene.name = "Garden-Planner-scene1";
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -116,7 +118,10 @@ function init() {
     hemiLight = new THREE.HemisphereLight(0xfdfbd3 , 0x34ad61, 0.4);
     scene.add(hemiLight);
 
-    pointLight = new THREE.PointLight(0xffa95c, 0.6); //Dir light for when flat lighting is checked
+    ambiLight = new THREE.AmbientLight(0xffa95c);
+    scene.add(ambiLight);
+    ambiLight.visible = false;
+    //pointLight = new THREE.PointLight(0xffa95c, 1, 100); //Dir light for when flat lighting is checked
 
     sunLight = new THREE.SpotLight(0xffa95c,1);
     sunLight.castShadow = true;
@@ -162,21 +167,12 @@ function init() {
             height: 100,    //change height
             type: "Grass",
             grid: true,
-            snapToGrid: true,
-            finalPlane: function() {    //Finalise the plane. Removes the folder so plane can't be changed again
-                gui.removeFolder(planeFolder);
-                addRestOfGUI();
-                console.log("Plane finalised");
-            }
+            snapToGrid: true
         },
         area: {     //Controls for area creation
             type: "Grass",          //Dropdown for the area type to be created
             createNew: function(){      //Button to create a new area
                 changeMouseMode(mouseMode.areaDef);   //Set the mouse mode to area creation
-                resetOutline();
-            },
-            continueArea: function(){
-                changeMouseMode(mouseMode.areaDef);
             },
             finishArea: function(){
                 finalOutline();
@@ -387,11 +383,12 @@ function init() {
         });
     planeFolder.add(world.plane, "type").options(areaTypes).name("Terrain type").   //Terrain type selector
     onChange(()=>{
-        collisionObjects.length = 0; //Clears the objects array
+        //collisionObjects.length = 0; //Clears the objects array
 
         scene.remove(planeMesh);    //deletes the old mesh
 
         //reset size sliders to 100
+        planeGeo = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);
 
         switch(world.plane.type)    //generates a new mesh with the selected material
         {
@@ -424,41 +421,17 @@ function init() {
                 collisionObjects.push(planeMesh);
                 break;
         }
+        collisionObjects.push(planeMesh);
     });
     planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{ gridMesh.visible = world.plane.grid; })
     planeFolder.add(world.plane, "snapToGrid").name("Snap to grid");
-    planeFolder.add(world.plane, "finalPlane").name("Finalise plane");  //Button to finalise plane. Removes plane folder
     planeFolder.open();
 
-
+    addRestOfGUI();
 
     //#endregion GUI folders
 
     //#endregion GUI
-
-    //#region camera controls
-
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000); //Create the main camera
-    camera.position.set(50, 80, 130);   //Set the initial position
-    camera.lookAt(0, 0, 0);             //Make the camera look at the origin (position of the plane)
-
-    controls = new OrbitControls(camera, renderer.domElement);  //Create the camera orbit controls
-
-    controls.listenToKeyEvents(window); // optional
-
-    controls.keyPanSpeed = 0;       //Disables key panning but allows panning with middle mouse
-    controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
-    controls.dampingFactor = 0.05;
-    controls.screenSpacePanning = false;
-    controls.minDistance = 10;      //Min and max zoom distances
-    controls.maxDistance = 1500;
-    controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
-
-    controls.mouseButtons = {
-        MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
-        RIGHT: THREE.MOUSE.ROTATE
-    }
-    //#endregion camera controls
 
     //#region raycast
 
@@ -469,9 +442,7 @@ function init() {
 
     //#region plane & grid
 
-    planeGeo = new THREE.BoxGeometry(100, 1, 100);
-    //planeGeo.rotateX(- Math.PI / 2);
-
+    planeGeo = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);
     
     planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
     planeMesh.castShadow = false;
@@ -503,14 +474,16 @@ function init() {
 
     //#region assignments and loaders
 
-    outlineFinished = false;
-    nodeID = 0;
-    areaID = 0;
-    areaHeightOffset = 0;
-    isMoving = false;
-    gridSnapFactor = 5;
-    confirmExportTimer = 0;
-    canInteract = true;
+    outlineFinished = false;    //For area creation
+    nodeID = 0;                 //Area creation
+    areaID = 0;                 //Area creation
+    areaHeightOffset = 0;       //Area creation
+    isMoving = false;           //Flag for moving placableobject
+    gridSnapFactor = 5;         //Factor for size of grid snapping
+    confirmExportTimer = 0;     //Timer for export confirm html message
+    canInteract = true;         //Bool to determine if the player can interact with the js scene
+
+    isFirstPerson = false;
 
     exporter = new GLTFExporter();
     exportSuccess = false;  //Flag for confim animation
@@ -520,6 +493,7 @@ function init() {
 
     loadAudio();
     loadFlagRollover();
+    changeCamera(!isFirstPerson);
     
     currentObject = placableObjects.trees.tree1;    //Default object selected
     updateCurrentObjectPath();                      //Update object filepath
@@ -532,6 +506,7 @@ function init() {
     //#endregion assignments and loaders
 
     //#region HTML
+
 
     link = document.createElement('a'); //Code for gltf exporter
     link.style.display = "none";
@@ -570,6 +545,40 @@ function init() {
 
     //#endregion HTML
 
+}
+
+function changeCamera(fp){
+    if(!fp) //Orbit controls
+    {
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000); //Create the main camera
+        camera.position.set(50, 80, 130);   //Set the initial position
+        camera.lookAt(0, 0, 0);             //Make the camera look at the origin (position of the plane)
+    
+        controls = new OrbitControls(camera, renderer.domElement);  //Create the camera orbit controls
+    
+        controls.listenToKeyEvents(window); // optional
+    
+        controls.keyPanSpeed = 0;       //Disables key panning but allows panning with middle mouse
+        controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 10;      //Min and max zoom distances
+        controls.maxDistance = 1500;
+        //controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
+    
+        controls.mouseButtons = {
+            MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
+            RIGHT: THREE.MOUSE.ROTATE
+        }
+    }
+    else{   //FP controls
+        camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight,1,1000);
+        camera.position.y = 10;
+
+        controls = new PointerLockControls(camera, document.body);
+    }
+}
+
 function addRestOfGUI(){
     const lightFolder = gui.addFolder("Lighting");
     lightFolder.add(world.lights, "timeScale", 1,10, 1).name("Orbit speed");
@@ -590,7 +599,6 @@ function addRestOfGUI(){
     const areaFolder = gui.addFolder("Area");       //Area folder added
     areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type");  //Add area type dropdown selector
     areaFolder.add(world.area, "createNew").name("New area (Q)");       //Add new area button
-    areaFolder.add(world.area, "continueArea").name("Continue Area (W)");
     areaFolder.add(world.area,"finishArea").name("Finish area (E)");    //add finish area button
     areaFolder.add(world.area, "clearAreas").name("Clear areas (R)");
 
@@ -987,8 +995,8 @@ function onPointerDown(event) {
         
                             const intersect = intersects[0];
                             if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
+
                                 let node;   //temp variable to store the gltf.scene object
-        
                                 new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
                                     node = gltf.scene;      //gltf model assigned to node object
                                     node.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
@@ -997,28 +1005,24 @@ function onPointerDown(event) {
                                             n.receiveShadow = true;
                                         }
                                     })
+
                                     node.scale.set(13,13,13);       //Increase scale
                                     node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
                                     if(world.plane.snapToGrid) node.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
                                     scene.add(node);        //Add the node to the scene
-                                    //node.position.y -= 1;
         
                                     node.name = "node " + nodeID;   //Give the node a name with the id
                                     nodeID++;       //increment id 
                                     nodes.push(node);               //Push node to the array of nodes
-                                    console.log("Pushed node:" + node.name);
-            
+                                    console.log("Pushed outline node:" + node.name);
+
                                     const pos = node.position;     //temp variable to store the point
                                     outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
-                                    console.log("Added point at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
+                                    console.log("Added outlinePoint at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
         
-                                    if (outlinePoints.length > 1) { //if there is more than one point, draw a line between them
-                                        drawLine();
-                                    }
+                                    if (outlinePoints.length > 1) { drawLine(); }         //if there is more than one point, draw a line between them
             
-                                    if (outlinePoints.length == 4) {    //Finishes the outline on four points
-                                        finalOutline();
-                                    }
+                                    if (outlinePoints.length == 4) { finalOutline(); }    //Finishes the outline on four points
                                 });
                             }
                         }
@@ -1041,8 +1045,9 @@ function onPointerDown(event) {
                     const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
     
                     if (intersects.length > 0) {    //If ray intersects with something
-    
+                        
                         const intersect = intersects[0];
+                        console.log("col with obj: "+intersect.object.name);
                         if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
                             let placableObject;   //temp variable to store the gltf.scene object
     
@@ -1064,8 +1069,14 @@ function onPointerDown(event) {
     
                                 placableObject.name = currentObject;
     
-                                if(placableObject.name == "Pot" || placableObject.name == "Square raised"){
-                                    collisionObjects.push(placableObject);    //If obj is to be used to stack, add to collision array
+                                if(placableObject.name == "Pot" || placableObject.name == "Square raised"){                                    
+                                    placableObject.traverse(n=>{
+                                        if(n.isMesh){ 
+                                            collisionObjects.push(n);
+                                            n.name = currentObject;
+                                        }
+                                    })
+
                                     console.log("Pushed object:" + placableObject.name + " to collisionObjects");
                                 } 
                                 else {
@@ -1198,28 +1209,44 @@ function onDocumentKeyDown(event) {
         switch(event.keyCode)
         {
             /////Macros/////
-            case 81: //q - new area
+            case 89: //y - new area
                 changeMouseMode(mouseMode.areaDef);
                 break;
-            case 87: //w - continue area
-                break;
-            case 69: //e - finish area
+            case 85: //u - finish area
                 finalOutline();
                 break;
-            case 82: //r - clear areas
+            case 73: //i - clear areas
                 clearAreas();
                 break;
-            case 65: //a - place obj
+            case 72: //h - place obj
                 changeMouseMode(mouseMode.objectPlace);
                 break;
-            case 83: //s - remove obj 
+            case 74: //j - remove obj 
                 changeMouseMode(mouseMode.objectRemove);
                 break;
-            case 68: //d - move obj
+            case 75: //k - move obj
                 changeMouseMode(mouseMode.objectMove);
                 break;
-            case 85:    //u - export scene
-                exportScene();
+        }
+    }
+
+    if(isFirstPerson){
+        switch(event.code){
+            case 'KeyW':
+                moveForward = true;
+                break;
+            case 'KeyA':
+                moveLeft = true;
+                break;
+            case 'KeyS':
+                moveBackward = true;
+                break;
+            case 'KeyD':
+                moveRight = true;
+                break;
+            case 'Space':
+                if (canJump) velocity.y += 350;
+                canJump = false;
                 break;
         }
     }
@@ -1230,17 +1257,29 @@ function onDocumentKeyDown(event) {
 
 function onDocumentKeyUp(event) {
 
-    switch (event.keyCode) {
-        case 16: isShiftDown = false; break;    //shift
+    if(isFirstPerson){
+        switch(event.code){
+            case 'KeyW':
+                moveForward = false;
+                break;
+            case 'KeyA':
+                moveLeft = false;
+                break;
+            case 'KeyS':
+                moveBackward = false;
+                break;
+            case 'KeyD':
+                moveRight = false;
+                break;
+        }
     }
 }
 
 function render() {
 
     requestAnimationFrame(render);
-    controls.update();
-
-    if(filenameInput == document.activeElement) console.log("file active");
+    console.log(isFirstPerson);
+    if(!isFirstPerson) controls.update();
 
     if(world.lights.sunCycleActive && !world.lights.flatLighting)     //If the sun cycle is active
     {
@@ -1280,17 +1319,19 @@ function render() {
         else sunSphere.visible = true;
         if(moonSphere.position.y <= -15) moonSphere.visible = false;
         else moonSphere.visible = true;
+
+        ambiLight.visible = false;
     }
-    else {
+    else {      //If sun cycle isnt running
         if(clock.running) clock.stop();
         hemiLight.intensity = 0.4; //If sun cycle isn't active, default to 0.4 intensity
+        ambiLight.visible = true;
     }
 
     if(exportSuccess)   //Export confirm appears for a couple of seconds
     {
         confirmExport.style.visibility = "visible";
         confirmExportTimer += clock.getDelta();
-        console.log(confirmExportTimer);
         if(confirmExportTimer > 0.004)
         {
             confirmExport.style.visibility = "hidden";
@@ -1314,7 +1355,7 @@ function drawLine() {
 
 function finalOutline() {
     if (outlinePoints.length > 2) { //If it is a triangle or more (>2 points)
-        console.log("Final outline");
+        console.log("Area created");
         outlinePoints.push(new THREE.Vector3(outlinePoints[0].x, outlinePoints[0].y, outlinePoints[0].z)); //Add a duplicate of the first point to the end of the array to make it a complete area
         drawLine();
         outlineFinished = true;
@@ -1363,13 +1404,15 @@ function finalOutline() {
 function resetOutline() {       //Clears nodes and outline points ready for a new area
     for (let i in nodes) {
         scene.remove(nodes[i].object);
-        console.log("Removed element: " + i.toString());
         scene.remove(scene.getObjectByName("node "+i));
     }
     nodes.length = 0;
     outlinePoints.length = 0;
+    nodeID = 0;
 
     outlineFinished = false;
+
+    scene.remove(scene.getObjectByName("outline"));
 }
 
 function clearAreas(){
@@ -1378,7 +1421,6 @@ function clearAreas(){
         scene.remove(scene.getObjectByName("area "+i));
     }
     areas.length = 0;
-    console.log(areas);
     areaID = 0;
 }
 
@@ -1415,6 +1457,7 @@ function changeMouseMode(mode)
             break;
         case mouseMode.areaDef:
             currentMouseMode = mouseMode.areaDef;
+            resetOutline();
             flagRollOverMesh.visible = true;
             document.getElementById("current-tool").innerHTML = " = create area";
             break;
@@ -1434,7 +1477,9 @@ function changeMouseMode(mode)
             document.getElementById("current-tool").innerHTML = " = move object";
             break;
     }
-}}
+
+    if(mode != mouseMode.areaDef) if(outlinePoints.length >0) resetOutline();    //Auto resets area creation when switching to another tool
+}
 
 function exportScene()
 {
@@ -1460,8 +1505,6 @@ function exportScene()
     exportSuccess = true;
 
     hemiLight.visible = true;
-    flagRollOverMesh.visible = true;
-    objectRolloverMesh.visible = true;
     sunSphere.visible = true;
     moonSphere.visible = true;
 }

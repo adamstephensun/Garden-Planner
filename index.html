@@ -39,8 +39,7 @@
 <body>
     <div id="app">
         <div id="info-box"
-        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50" 
-        style="top: 2%; left: 2%">
+        class="fixed top-3 left-3 border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50" >
             <h1 class="font-work-sans"> <i>Garden Planner - <a href = "https://www.adam-stephenson.co.uk/" target="_blank"> Adam Stephenson </i> </a></h1>
             <div>
                 <i class="fas fa-tools"></i>
@@ -68,20 +67,13 @@
         </div>
 
         <div id="help"
-        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 w-1/2"
-        style="bottom: 2%;right:2%" >
+        class="fixed right-3 bottom-3 border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 w-1/4 ">
             <h1 class="font-work-sans text-lg">
                 <i>Help</i>
             </h1>
-            <h2 id="help-h2" class="font-work-sans">
-                Plane
-            </h2>
-            <p id="help-p" class="font-glory text-sm">
-                Welcome to garden planner! Use this tool to plan your dream garden! <br>
-                Use the menu on the top right of the screen to make changes. <br>
-                Start by altering the plane by changing the size, terrain type, and grid snapping. Click finalise to finish editing the plane. <br><br>
-            </p>
-
+            <h2 id="help-h2" class="font-work-sans"></h2>
+            <p id="help-p" class="font-glory text-sm"></p>
+            
             <button id="help-back"
             class="absolute bottom-2 right-12 border px-2 py-1 rounded-lg fill-current border-transparent bg-black bg-opacity-50 max-w-lg">
                 <i class="fas fa-arrow-left"></i>
@@ -94,23 +86,11 @@
 
         </div>
 
-        <div id="controls-box" 
-        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50"
-        style = "bottom: 2%; left: 15%">
-            <p class = "font-glory text-sm">
-                Right mouse - rotate<br>
-                Middle mouse - pan<br>
-                Left mouse - selected tool<br>
-                Arrow keys - rotate and scale
-            </p>
-        </div>
-        <div id="controls-box-2"
-        class="absolute border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50"
-        style = "bottom: 2%; left: 2%">
+        <div id="controls-box"
+        class="fixed bottom-3 left-3 border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50">
             <h1 class="font-work-sans"> <i>Controls</i></h1>
             <p class = "font-glory text-sm">
             Q - new area <br>
-            W - continue area <br>
             E - finish area <br>
             R - clear areas <br>
             A - place object <br>
@@ -118,7 +98,17 @@
             D - move object <br>
             </p>
         </div>
-            
+
+        <div id="controls-box-2" 
+        class="fixed bottom-3 left-36 border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50">
+            <p class = "font-glory text-sm">
+                Right mouse - rotate<br>
+                Middle mouse - pan<br>
+                Left mouse - selected tool<br>
+                Arrow keys - rotate and scale
+            </p>
+        </div>
+
 
     </div>
     <script type="module" src="index.js"></script>
