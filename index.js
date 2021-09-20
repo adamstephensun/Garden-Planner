@@ -33,6 +33,7 @@ let velocity, direction;
 
 let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
+let toggleCamButton, controlsBox1, controlsBox2, crosshair;
 
 const collisionObjects = [];
 const nodes = [];
@@ -484,12 +485,12 @@ function init() {
     confirmExportTimer = 0;     //Timer for export confirm html message
     canInteract = true;         //Bool to determine if the player can interact with the js scene
 
-    isFirstPerson = true;
-    prevTime = performance.now();
+    prevTime = performance.now();       //Used for movement
     fpRaycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3(0,-1,0), 0,10);
     velocity = new THREE.Vector3(0,0,0);
     direction = new THREE.Vector3(0,0,0);
-    moveForward = false;
+    isFirstPerson = false;
+    moveForward = false;    //All have to be given a value or we get NaN errors
     moveBackward = false;
     moveLeft = false;
     moveRight = false;
@@ -516,11 +517,10 @@ function init() {
 
     //#region HTML
 
-
     link = document.createElement('a'); //Code for gltf exporter
     link.style.display = "none";
     document.body.appendChild(link);
-
+    
     //////Export scene//////
     document.getElementById('export-scene').addEventListener('click', function(){exportScene();})
     confirmExport = document.getElementById("export-confirm");
@@ -543,14 +543,42 @@ function init() {
     helpPage = 0;
     updateHelp();
     toggleHelp();
+
+    //////Controls boxes/////
+    controlsBox1 = document.getElementById("controls-box");
+    controlsBox2 = document.getElementById("controls-box-2");
+
+    //////Toggle cam button////
+    toggleCamButton = document.getElementById("toggle-cam");
+    toggleCamButton.addEventListener('click', function(){
+        isFirstPerson = !isFirstPerson;
+        changeCamera(isFirstPerson);
+    });
     
-    /////info box (top left)//////
+    //////Crosshair//////
+    crosshair = document.getElementById("crosshair");
+    //crosshair.style.visibility = "hidden";
+
+    /////disabling interaction when hovering on UI elements
     infoBox = document.getElementById("info-box");
-    infoBox.addEventListener('mouseenter', function(){ canInteract = false; })
+    infoBox.addEventListener('mouseenter', function(){ canInteract = false; })  //Top left info box
     infoBox.addEventListener('mouseleave', function(){ canInteract = true; })
 
-    gui.domElement.addEventListener('mouseenter', function(){ canInteract = false; })
+    helpBox.addEventListener('mouseenter', function(){ canInteract = false; })    //Help box
+    helpBox.addEventListener('mouseleave', function(){canInteract = true;})
+
+    controlsBox1.addEventListener('mouseenter', function(){ canInteract = false; })    //Controls box 1
+    controlsBox1.addEventListener('mouseleave', function(){canInteract = true;})
+
+    controlsBox2.addEventListener('mouseenter', function(){ canInteract = false; })    //Controls box 2
+    controlsBox2.addEventListener('mouseleave', function(){canInteract = true;})
+
+    toggleCamButton.addEventListener('mouseenter', function(){ canInteract = false; })    //Cam toggle button
+    toggleCamButton.addEventListener('mouseleave', function(){canInteract = true;})
+
+    gui.domElement.addEventListener('mouseenter', function(){ canInteract = false; })   //Dat gui
     gui.domElement.addEventListener('mouseleave', function(){ canInteract = true; })
+
 
     //#endregion HTML
 
@@ -579,14 +607,16 @@ function changeCamera(fp){
             MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
             RIGHT: THREE.MOUSE.ROTATE
         }
+
+        document.getElementById("crosshair").style.visibility = "hidden";
     }
     else{   //FP controls
-        camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight,1,1000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight,1,1000);
         camera.position.y = 10;
 
         controls = new PointerLockControls(camera, document.body);
         scene.add(controls.getObject());
-        //controls.lock();
+        document.getElementById("crosshair").style.visibility = "visible";
     }
 }
 
@@ -946,7 +976,10 @@ function onPointerMove(event) {
 
     if(canInteract){
         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-        raycaster.setFromCamera(pointer, camera);
+
+        if(isFirstPerson) raycaster.setFromCamera(new THREE.Vector2(), camera);
+        else raycaster.setFromCamera(pointer, camera);
+
         const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
     
         if (intersects.length > 0) {
@@ -989,207 +1022,210 @@ function onPointerMove(event) {
 
 function onPointerDown(event) {
 
-    if(isFirstPerson) controls.lock();
-
     if(canInteract){
-        switch(currentMouseMode)    //Master switch for mouse mode
+        if(isFirstPerson && controls.isLocked)
         {
-            case mouseMode.areaDef:         //Area definition mode
-                
-                switch (event.which){   ////Mouse button switch 
-                    case 1: //Left click area definition
-                    if (!outlineFinished) {
+            switch(currentMouseMode)    //Master switch for mouse mode
+            {
+                case mouseMode.areaDef:         //Area definition mode
+                    
+                    switch (event.which){   ////Mouse button switch 
+                        case 1: //Left click area definition
+                        if (!outlineFinished) {
+        
+                            pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                            raycaster.setFromCamera(pointer, camera);
+                            const intersects = raycaster.intersectObjects(collisionObjects);
+            
+                            if (intersects.length > 0) {    //If ray intersects with something
+            
+                                const intersect = intersects[0];
+                                if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
     
+                                    let node;   //temp variable to store the gltf.scene object
+                                    new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
+                                        node = gltf.scene;      //gltf model assigned to node object
+                                        node.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
+                                            if(n.isMesh){
+                                                n.castShadow = true;
+                                                n.receiveShadow = true;
+                                            }
+                                        })
+    
+                                        node.scale.set(13,13,13);       //Increase scale
+                                        node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                                        if(world.plane.snapToGrid) node.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
+                                        scene.add(node);        //Add the node to the scene
+            
+                                        node.name = "node " + nodeID;   //Give the node a name with the id
+                                        nodeID++;       //increment id 
+                                        nodes.push(node);               //Push node to the array of nodes
+                                        console.log("Pushed outline node:" + node.name);
+    
+                                        const pos = node.position;     //temp variable to store the point
+                                        outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
+                                        console.log("Added outlinePoint at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
+            
+                                        if (outlinePoints.length > 1) { drawLine(); }         //if there is more than one point, draw a line between them
+                
+                                        if (outlinePoints.length == 4) { finalOutline(); }    //Finishes the outline on four points
+                                    });
+                                }
+                            }
+                        }
+                            break;
+                        case 2: //Middle click area definition
+                            break;
+                        case 3: //right click area definition
+                            break;
+                    }
+                    
+                break;
+                case mouseMode.objectPlace:     //Object placing mode
+        
+                switch (event.which){   ////Mouse button switch 
+                    case 1: //Left click object place
+
                         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                        raycaster.setFromCamera(pointer, camera);
-                        const intersects = raycaster.intersectObjects(collisionObjects);
+                        if(isFirstPerson) raycaster.setFromCamera(new THREE.Vector2(), camera);
+                        else raycaster.setFromCamera(pointer, camera);
+                        const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
         
                         if (intersects.length > 0) {    //If ray intersects with something
-        
+                            
                             const intersect = intersects[0];
+                            console.log("col with obj: "+intersect.object.name);
                             if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
-
-                                let node;   //temp variable to store the gltf.scene object
-                                new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
-                                    node = gltf.scene;      //gltf model assigned to node object
-                                    node.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
+                                let placableObject;   //temp variable to store the gltf.scene object
+        
+                                new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads the current selected model
+                                    placableObject = gltf.scene;      //gltf model assigned to temp variable
+                                    placableObject.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
                                         if(n.isMesh){
                                             n.castShadow = true;
                                             n.receiveShadow = true;
                                         }
                                     })
-
-                                    node.scale.set(13,13,13);       //Increase scale
-                                    node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                                    if(world.plane.snapToGrid) node.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
-                                    scene.add(node);        //Add the node to the scene
+                                    placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+                                    placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y, objectRolloverMesh.position.z);    //Offset so objects aren't floating
         
-                                    node.name = "node " + nodeID;   //Give the node a name with the id
-                                    nodeID++;       //increment id 
-                                    nodes.push(node);               //Push node to the array of nodes
-                                    console.log("Pushed outline node:" + node.name);
-
-                                    const pos = node.position;     //temp variable to store the point
-                                    outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
-                                    console.log("Added outlinePoint at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
+                                    if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
+                                    placableObject.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
+                                    placableObject.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
+                                    scene.add(placableObject);        //Add the object to the scene
         
-                                    if (outlinePoints.length > 1) { drawLine(); }         //if there is more than one point, draw a line between them
-            
-                                    if (outlinePoints.length == 4) { finalOutline(); }    //Finishes the outline on four points
+                                    placableObject.name = currentObject;
+        
+                                    if(placableObject.name == "Pot" || placableObject.name == "Square raised"){                                    
+                                        placableObject.traverse(n=>{
+                                            if(n.isMesh){ 
+                                                collisionObjects.push(n);
+                                                n.name = currentObject;
+                                            }
+                                        })
+    
+                                        console.log("Pushed object:" + placableObject.name + " to collisionObjects");
+                                    } 
+                                    else {
+                                        placedObjects.push(placableObject);               //if obj is not to be collided with, add to array of objs
+                                        console.log("Pushed object:" + placableObject.name + " to placedObjects");
+                                    }
+                                    spawnSound.play();
                                 });
                             }
+                            if(isMoving) {
+                                changeMouseMode(mouseMode.objectMove); 
+                                isMoving = false;
+                                objectRolloverMesh.visible = false;
+                            }
                         }
-                    }
                         break;
-                    case 2: //Middle click area definition
+                    case 2: //Middle click
                         break;
-                    case 3: //right click area definition
+                    case 3: //right click
                         break;
                 }
-                
-            break;
-            case mouseMode.objectPlace:     //Object placing mode
-    
-            switch (event.which){   ////Mouse button switch 
-                case 1: //Left click object place
-    
-                    pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                    raycaster.setFromCamera(pointer, camera);
-                    const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
-    
-                    if (intersects.length > 0) {    //If ray intersects with something
-                        
-                        const intersect = intersects[0];
-                        console.log("col with obj: "+intersect.object.name);
-                        if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
-                            let placableObject;   //temp variable to store the gltf.scene object
-    
-                            new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads the current selected model
-                                placableObject = gltf.scene;      //gltf model assigned to temp variable
-                                placableObject.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
-                                    if(n.isMesh){
-                                        n.castShadow = true;
-                                        n.receiveShadow = true;
-                                    }
-                                })
-                                placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                                placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y, objectRolloverMesh.position.z);    //Offset so objects aren't floating
-    
-                                if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
-                                placableObject.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
-                                placableObject.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
-                                scene.add(placableObject);        //Add the object to the scene
-    
-                                placableObject.name = currentObject;
-    
-                                if(placableObject.name == "Pot" || placableObject.name == "Square raised"){                                    
-                                    placableObject.traverse(n=>{
-                                        if(n.isMesh){ 
-                                            collisionObjects.push(n);
-                                            n.name = currentObject;
-                                        }
-                                    })
-
-                                    console.log("Pushed object:" + placableObject.name + " to collisionObjects");
-                                } 
-                                else {
-                                    placedObjects.push(placableObject);               //if obj is not to be collided with, add to array of objs
-                                    console.log("Pushed object:" + placableObject.name + " to placedObjects");
-                                }
-                                spawnSound.play();
-                            });
+        
+                    break;
+                case mouseMode.objectRemove:    //Object removing mode
+        
+                switch (event.which){   ////Mouse button switch 
+                    case 1: //Left click
+        
+                        pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                        raycaster.setFromCamera(pointer, camera);
+        
+                        const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
+                                                                                            //true parameter makes it search recursively through the objects children
+                        if (intersects.length > 0) {    //If ray intersects with something
+        
+                            const intersect = intersects[0];
+                            const parentId = intersect.object.parent.parent.id;
+        
+                            intersect.object.parent.traverse(n =>{
+                                scene.remove(n);
+                            })
+        
+                            scene.remove(scene.getObjectById(parentId));  //Removes the parent of the object 
+                            console.log("Removed object: "+parentId);
+        
+                            const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
+                            if(index > -1) placedObjects.splice(index,1);
+                            deleteSound.play();
                         }
-                        if(isMoving) {
-                            changeMouseMode(mouseMode.objectMove); 
-                            isMoving = false;
-                            objectRolloverMesh.visible = false;
+                        break;
+                    case 2: //Middle click
+                        break;
+                    case 3: //right click
+                        break;
+                }
+                break;
+                case mouseMode.objectMove:      //Object moving mode
+        
+                switch (event.which){   ////Mouse button switch 
+                    case 1: //Left click
+        
+                        pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                        raycaster.setFromCamera(pointer, camera);
+        
+                        const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
+                                                                                            //true parameter makes it search recursively through the objects children
+                        if (intersects.length > 0) {    //If ray intersects with something
+        
+                            const intersect = intersects[0];
+                            const parentId = intersect.object.parent.parent.id;
+                            currentObject = intersect.object.parent.parent.name;
+        
+                            intersect.object.parent.traverse(n =>{
+                                scene.remove(n);
+                            })
+        
+                            scene.remove(scene.getObjectById(parentId));  //Removes the parent of the object 
+                            console.log("Removed object: "+parentId);
+        
+                            const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
+                            if(index > -1) placedObjects.splice(index,1);
+                            deleteSound.play();
+                            ////Removed the object, get the object and set to place mode
+        
+        
+                            changeMouseMode(mouseMode.objectPlace);
+                            isMoving = true;
                         }
-                    }
-                    break;
-                case 2: //Middle click
-                    break;
-                case 3: //right click
-                    break;
-            }
-    
-                break;
-            case mouseMode.objectRemove:    //Object removing mode
-    
-            switch (event.which){   ////Mouse button switch 
-                case 1: //Left click
-    
-                    pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                    raycaster.setFromCamera(pointer, camera);
-    
-                    const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
-                                                                                        //true parameter makes it search recursively through the objects children
-                    if (intersects.length > 0) {    //If ray intersects with something
-    
-                        const intersect = intersects[0];
-                        const parentId = intersect.object.parent.parent.id;
-    
-                        intersect.object.parent.traverse(n =>{
-                            scene.remove(n);
-                        })
-    
-                        scene.remove(scene.getObjectById(parentId));  //Removes the parent of the object 
-                        console.log("Removed object: "+parentId);
-    
-                        const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
-                        if(index > -1) placedObjects.splice(index,1);
-                        deleteSound.play();
-                    }
-                    break;
-                case 2: //Middle click
-                    break;
-                case 3: //right click
+        
+                        break;
+                    case 2: //Middle click
+                        break;
+                    case 3: //right click
+                        break;
+                }
+        
                     break;
             }
-            break;
-            case mouseMode.objectMove:      //Object moving mode
-    
-            switch (event.which){   ////Mouse button switch 
-                case 1: //Left click
-    
-                    pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                    raycaster.setFromCamera(pointer, camera);
-    
-                    const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
-                                                                                        //true parameter makes it search recursively through the objects children
-                    if (intersects.length > 0) {    //If ray intersects with something
-    
-                        const intersect = intersects[0];
-                        const parentId = intersect.object.parent.parent.id;
-                        currentObject = intersect.object.parent.parent.name;
-    
-                        intersect.object.parent.traverse(n =>{
-                            scene.remove(n);
-                        })
-    
-                        scene.remove(scene.getObjectById(parentId));  //Removes the parent of the object 
-                        console.log("Removed object: "+parentId);
-    
-                        const index = placedObjects.indexOf(intersect.object.parent);   //Removes the object from the array
-                        if(index > -1) placedObjects.splice(index,1);
-                        deleteSound.play();
-                        ////Removed the object, get the object and set to place mode
-    
-    
-                        changeMouseMode(mouseMode.objectPlace);
-                        isMoving = true;
-                    }
-    
-                    break;
-                case 2: //Middle click
-                    break;
-                case 3: //right click
-                    break;
-            }
-    
-                break;
         }
     }
     
+    if(isFirstPerson) controls.lock();
 }
 
 function onDocumentKeyDown(event) {
@@ -1305,16 +1341,16 @@ function render() {
 
             const delta = (time - prevTime)/1000;
 
-            velocity.x -= velocity.x  * delta;
-            velocity.z -= velocity.z  * delta;
+            velocity.x -= velocity.x * 15 * delta;
+            velocity.z -= velocity.z * 15 * delta;
             velocity.y -= 9.8 * 70 * delta;    //100 = mass
     
             direction.z = Number(moveForward) - Number(moveBackward);
             direction.x = Number(moveRight) - Number(moveLeft);
             direction.normalize();
     
-            if(moveForward || moveBackward) velocity.z -= direction.z * 40.0 * delta;
-            if(moveLeft || moveRight) velocity.x -= direction.x * 40.0 * delta;
+            if(moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+            if(moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
     
             if(onObject){
                 velocity.y = Math.max(0, velocity.y);
