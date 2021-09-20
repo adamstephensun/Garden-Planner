@@ -28,9 +28,8 @@ let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished, exportSuccess, canInteract, helpActive = new Boolean;
 
 let prevTime, fpRaycaster;
-let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = false;
-let velocity = new THREE.Vector3();
-let direction = new THREE.Vector3();
+let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = new Boolean;
+let velocity, direction;
 
 let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
@@ -488,6 +487,12 @@ function init() {
     isFirstPerson = true;
     prevTime = performance.now();
     fpRaycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3(0,-1,0), 0,10);
+    velocity = new THREE.Vector3(0,0,0);
+    direction = new THREE.Vector3(0,0,0);
+    moveForward = false;
+    moveBackward = false;
+    moveLeft = false;
+    moveRight = false;
 
     exporter = new GLTFExporter();
     exportSuccess = false;  //Flag for confim animation
@@ -580,6 +585,7 @@ function changeCamera(fp){
         camera.position.y = 10;
 
         controls = new PointerLockControls(camera, document.body);
+        scene.add(controls.getObject());
         //controls.lock();
     }
 }
@@ -603,14 +609,14 @@ function addRestOfGUI(){
 
     const areaFolder = gui.addFolder("Area");       //Area folder added
     areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type");  //Add area type dropdown selector
-    areaFolder.add(world.area, "createNew").name("New area (Q)");       //Add new area button
-    areaFolder.add(world.area,"finishArea").name("Finish area (E)");    //add finish area button
-    areaFolder.add(world.area, "clearAreas").name("Clear areas (R)");
+    areaFolder.add(world.area, "createNew").name("New area (Y)");       //Add new area button
+    areaFolder.add(world.area,"finishArea").name("Finish area (U)");    //add finish area button
+    areaFolder.add(world.area, "clearAreas").name("Clear areas (I)");
 
     const objectFolder = gui.addFolder("Objects");              //Add the objects folder
-    objectFolder.add(world.objects, "place").name("Place (A)");     //Add place, remove, move buttons
-    objectFolder.add(world.objects, "remove").name("Remove (S)");
-    objectFolder.add(world.objects, "move").name("Move (D)");
+    objectFolder.add(world.objects, "place").name("Place (J)");     //Add place, remove, move buttons
+    objectFolder.add(world.objects, "remove").name("Remove (K)");
+    objectFolder.add(world.objects, "move").name("Move (L)");
 
     const treeFolder = objectFolder.addFolder("Trees");         //Add tree folder to the objects folder
     treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
@@ -1225,13 +1231,13 @@ function onDocumentKeyDown(event) {
             case 73: //i - clear areas
                 clearAreas();
                 break;
-            case 72: //h - place obj
+            case 74: //j - place obj
                 changeMouseMode(mouseMode.objectPlace);
                 break;
-            case 74: //j - remove obj 
+            case 75: //k - remove obj 
                 changeMouseMode(mouseMode.objectRemove);
                 break;
-            case 75: //k - move obj
+            case 76: //l - move obj
                 changeMouseMode(mouseMode.objectMove);
                 break;
         }
@@ -1252,7 +1258,7 @@ function onDocumentKeyDown(event) {
                 moveRight = true;
                 break;
             case 'Space':
-                if (canJump) velocity.y += 350;
+                if (canJump) velocity.y += 170;
                 canJump = false;
                 break;
         }
@@ -1301,7 +1307,7 @@ function render() {
 
             velocity.x -= velocity.x  * delta;
             velocity.z -= velocity.z  * delta;
-            velocity.y -= 9.8 * 100 * delta;    //100 = mass
+            velocity.y -= 9.8 * 70 * delta;    //100 = mass
     
             direction.z = Number(moveForward) - Number(moveBackward);
             direction.x = Number(moveRight) - Number(moveLeft);
@@ -1321,11 +1327,11 @@ function render() {
 
             if(controls.getObject().position.y < 10){
                 velocity.y = 0;
-                controls.getObject().position.y =10;
+                controls.getObject().position.y = 10;
                 canJump = true;
             }
 
-            console.log(controls.getObject().position);
+            console.log(moveForward);
 
             if(controls.getObject().position.y < -100) controls.getObject().position = new THREE.Vector3(0,10,0);
         }
