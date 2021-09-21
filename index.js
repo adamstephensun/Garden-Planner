@@ -93,7 +93,6 @@ const mouseMode = {
 
 let currentMouseMode = mouseMode.areaDef;
 
-
 let currentObject, currentObjectPath, isMoving, currentObjectScale, currentObjectRotation;
 
 //#endregion declarations
@@ -780,15 +779,15 @@ function addRestOfGUI(){
 }
 
 function updateHelp(){
-    if(helpPage <0) helpPage = 4;
-    if(helpPage >4) helpPage = 0;
+    if(helpPage <0) helpPage = 5;
+    if(helpPage >5) helpPage = 0;
     console.log("Changing to help page: "+helpPage);
 
     switch(helpPage)
     {
         case 0:
             helpH2.innerHTML = "1: Plane";
-            helpP.innerHTML = "Welcome to garden planner! Use this tool to plan your dream garden!  <br> Use the menu on the top right of the screen to make changes. <br> Start by altering the plane by changing the size, terrain type, and grid snapping. Click finalise to finish editing the plane. <br> Press the help button to close this menu. <br><br>";
+            helpP.innerHTML = "Welcome to garden planner! Use this tool to plan your dream garden!  <br> Use the menu on the top right of the screen to make changes. <br> Start by altering the plane by changing the terrain type and grid snapping. Click the 'New plane' button or press the Y key to select the new plane tool. Click on the white spaces to create new planes.  <br> Press the help button to close this menu. <br><br>";
             break;
         case 1:
             helpH2.innerHTML = "2: Lighting";
@@ -803,7 +802,11 @@ function updateHelp(){
             helpP.innerHTML = "The objects panel holds all the placable props in folders, such as trees, plants, and furniture.<br> There are also tools to be selected for placing objects (A key), removing objects (S key), and moving objects (D key). <br> <br> <br>";
             break;
         case 4:
-            helpH2.innerHTML = "5: Exporting";
+            helpH2.innerHTML = "5: Camera";
+            helpP.innerHTML = "There are two camera types available, orbit and first person. Click the camera button in the top left to toggle between them. <br>  "
+            break;
+        case 5:
+            helpH2.innerHTML = "6: Exporting";
             helpP.innerHTML = "The 'export scene' button in the top-left allows you to export the scene as a .glTF model. This includes the plane and all the objects you placed on it. <br> You can enter a file name in the field below to rename the file. <br> <br>";
             break;
     }
@@ -1347,6 +1350,7 @@ function onDocumentKeyDown(event) {
         case 38:    //Arrow up - scale up
             currentObjectScale += 0.5; 
             console.log("Scale changed to: " + currentObjectScale);
+            document.getElementById("current-scale").innerHTML
             break; 
         case 40:    //Arrow down - scale down
             currentObjectScale -= 0.5; 
