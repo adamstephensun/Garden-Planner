@@ -6,15 +6,16 @@ import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.m
 import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js";
 import { GLTFExporter } from "https://unpkg.com/three@0.126.1/examples/jsm/exporters/GLTFExporter.js";
 import { PointerLockControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/PointerLockControls.js"; 
-import { TransformControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/TransformControls.js";
+import { DragControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/DragControls.js";
 
 //#region declarations
-let camera, listener, scene, renderer, orbitControls, transformControls, gui, world;
+let camera, listener, scene, renderer, labelRenderer, controls, gui, world;
 let hemiLight, sunLight, moonLight, pointLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
-let planeMesh, planeSelectorGeo, planeID;
+let planeMesh, planeSelectorGeo, planeID, largePlaneMat;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
+let dragControls, dragGeo, dragMat;
 
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal, gridTexture;
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, gridMaterial;
@@ -107,6 +108,7 @@ function init() {
     scene = new THREE.Scene();
     scene.background = skyColour;
     scene.name = "Garden-Planner-scene1";
+    //scene.fog = new THREE.Fog(0xFFFFFF, 10, 300);
 
     renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
@@ -114,8 +116,13 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-
     document.body.appendChild(renderer.domElement);
+
+    /*labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.position = 'absolute';
+    labelRenderer.domElement.style.top = '0px';
+    document.body.appendChild(labelRenderer.domElement);*/
 
     loadTextures();
 
@@ -170,8 +177,8 @@ function init() {
 
     world = {   //World variables
         plane: {            //Controls for the plane
-            width: 100,     //change width
-            height: 100,    //change height
+            width: 50,     //change width
+            height: 50,    //change height
             type: "Grass",
             grid: true,
             snapToGrid: true,
@@ -451,30 +458,25 @@ function init() {
 
     //#endregion raycast
 
+    //#region drag
+
+    dragGeo = new THREE.SphereGeometry(1,32,16);
+    dragMat = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
+    
+    //dragControls = new DragControls
+    
+    //#endregion drag
+
     //#region plane & grid
     
     planeGeo = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);
     planeSelectorGeo = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
-    gridGeo = new THREE.PlaneGeometry(100,100);
+    gridGeo = new THREE.PlaneGeometry(world.plane.width,world.plane.height);
     
     planeID = 0;
-    //createPlane(new THREE.Vector3());
+    createPlane(new THREE.Vector3());
 
-    //console.log("New plane at x:"+pos.x+"  z:"+pos.z);
-    planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
-    planeMesh.castShadow = false;
-    planeMesh.receiveShadow = true;
-    planeMesh.name = "plane " + planeID;
-    //planeMesh.position.x = pos.x;
-    //planeMesh.position.z = pos.z;
-    scene.add(planeMesh);
-    collisionObjects.push(planeMesh);
-    
-    gridMesh = new THREE.Mesh(gridGeo, gridMaterial);
-    gridMesh.rotateX(- Math.PI / 2);
-    gridMesh.position.set(0,0.555,0);
-    gridMesh.name = "Grid "+planeID;
-    scene.add(gridMesh);
+    //planeMesh.add(gridMesh);  
 
     //#endregion plane & grid
 
@@ -524,22 +526,9 @@ function init() {
     days = 0;
     
     changeCamera(isFirstPerson);
-
-    ////////Transform controls///////
-    transformControls = new TransformControls(camera, renderer.domElement);
-    transformControls.addEventListener('change', animate);
-    transformControls.addEventListener('dragging-changed', function(event){
-        orbitControls.enabled = !event.value;
-    })
-
-    transformControls.showY = false;
-    transformControls.setMode('scale');
-
-    transformControls.attach(planeMesh);
-    scene.add(transformControls);
-    
     loadAudio();
     loadFlagRollover();
+    controls.enabled = false;
     
     currentObject = placableObjects.trees.tree1;    //Default object selected
     updateCurrentObjectPath();                      //Update object filepath
@@ -621,6 +610,7 @@ function init() {
 
 
     //#endregion HTML
+
 }
 
 function createPlane(pos){
@@ -637,11 +627,25 @@ function createPlane(pos){
     
     gridMesh = new THREE.Mesh(gridGeo, gridMaterial);
     gridMesh.rotateX(- Math.PI / 2);
-    gridMesh.position.set(pos.x,pos.y +0.555,pos.z);
+    //gridMesh.position.set(pos.x,pos.y +0.555,pos.z);
+    gridMesh.position.y += 0.555;
     gridMesh.name = "Grid "+planeID;
     scene.add(gridMesh);
-    //planeMesh.add(gridMesh);
+    planeMesh.add(gridMesh);
     
+    const dragMesh = new THREE.Mesh(dragGeo, flagRollOverMaterial);
+    dragMesh.position.x = world.plane.width /2 + 5;
+    dragMesh.name = "dragMeshX";
+    scene.add(dragMesh);
+    console.log(dragMesh);
+    const startPos = dragMesh.position;
+
+    /*dragControls = new DragControls(dragMesh, camera, renderer.domElement);
+    dragControls.addEventListener('dragstart', function(event){
+        console.log(event.object);
+        const delta = dragMesh.position - startPos;
+        planeMesh.scale.x += delta;
+    })*/
     
     const planeSelectorMeshRight = new THREE.Mesh(planeSelectorGeo, objectRolloverMaterial);
     planeSelectorMeshRight.position.x += pos.x + world.plane.width;
@@ -670,6 +674,8 @@ function createPlane(pos){
     planeSelectorMeshBottom.rotateX(-Math.PI/2);
     planeSelectorMeshBottom.name = "Plane "+planeID+" bottom";
     scene.add(planeSelectorMeshBottom);
+
+
     
     planeSelectors.push(planeSelectorMeshRight);
     planeSelectors.push(planeSelectorMeshLeft);
@@ -688,19 +694,19 @@ function changeCamera(fp){
         camera.position.set(50, 80, 130);   //Set the initial position
         camera.lookAt(0, 0, 0);             //Make the camera look at the origin (position of the plane)
     
-        orbitControls = new OrbitControls(camera, renderer.domElement);  //Create the camera orbit controls
+        controls = new OrbitControls(camera, renderer.domElement);  //Create the camera orbit controls
     
-        orbitControls.listenToKeyEvents(window); // optional
+        controls.listenToKeyEvents(window); // optional
     
-        orbitControls.keyPanSpeed = 0;       //Disables key panning but allows panning with middle mouse
-        orbitControls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
-        orbitControls.dampingFactor = 0.05;
-        orbitControls.screenSpacePanning = false;
-        orbitControls.minDistance = 10;      //Min and max zoom distances
-        orbitControls.maxDistance = 1500;
+        controls.keyPanSpeed = 0;       //Disables key panning but allows panning with middle mouse
+        controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 10;      //Min and max zoom distances
+        controls.maxDistance = 1500;
         //controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
     
-        orbitControls.mouseButtons = {
+        controls.mouseButtons = {
             MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
             RIGHT: THREE.MOUSE.ROTATE
         }
@@ -712,8 +718,8 @@ function changeCamera(fp){
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight,1,1000);
         camera.position.y = 10;
 
-        orbitControls = new PointerLockControls(camera, document.body);
-        scene.add(orbitControls.getObject());
+        controls = new PointerLockControls(camera, document.body);
+        scene.add(controls.getObject());
         document.getElementById("crosshair").style.visibility = "visible";
         document.getElementById("controls-fp").style.visibility = "visible";
     }
@@ -1063,6 +1069,8 @@ function loadTextures() {
 
     starTexture = new THREE.TextureLoader().load("textures/stars.png");
 
+    largePlaneMat = new THREE.MeshBasicMaterial({color: 0x1e8219})
+
     objectRolloverMaterial = new THREE.MeshBasicMaterial({ opacity: 0.5, transparent: true});
     flagRollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
 }
@@ -1127,57 +1135,138 @@ function onPointerMove(event) {
 function onPointerDown(event) {
 
     if(canInteract){
+
+        pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);   //Pointer is the mouse position on the screen as a vec2
+                        
+        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+        else raycaster.setFromCamera(pointer, camera);
+
+        const intersects = raycaster.intersectObjects(collisionObjects); //intersect[] contains the plane and all stackable objects
+
+        if(intersects.length > 0)
+        {
+            const intersect = intersects[0];
+
+            switch (currentMouseMode){
+
+                case mouseMode.none:
+
+                    switch(event.which){
+                        case 1: //Left click
+                            break;
+                        case 2: //Middle click
+                            break;
+                        case 3: //Right click
+                            break;
+                    }
+        
+                    break;
+                case mouseMode.areaDef:
+
+                    console.log("area clicky");
+                    switch(event.which){
+                        case 1: //Left click
+                            console.log("intersect"+intersect);
+
+                            if(!outlineFinished)
+                            {
+                                if (collisionObjects.includes(intersect.object)){ spawnNode(intersect.object.position); }  //if intersect is included in the objects array
+                            }
+
+                            break;
+                        case 2: //Middle click
+                            break;
+                        case 3: //Right click
+                            break;
+                    }
+            
+                    break;
+                case mouseMode.objectPlace:
+
+                    switch(event.which){
+                        case 1: //Left click
+                            break;
+                        case 2: //Middle click
+                            break;
+                        case 3: //Right click
+                            break;
+                    }
+
+                    break;
+                case mouseMode.objectRemove:
+
+                    switch(event.which){
+                        case 1: //Left click
+                            break;
+                        case 2: //Middle click
+                            break;
+                        case 3: //Right click
+                            break;
+                    }
+
+                    break;
+                case mouseMode.objectMove:
+
+                    switch(event.which){
+                        case 1: //Left click
+                            break;
+                        case 2: //Middle click
+                            break;
+                        case 3: //Right click
+                            break;
+                    }
+
+                    break;
+                case mouseMode.newPlane:
+
+                    switch(event.which){
+                        case 1: //Left click
+                            console.log("new plane clicky");
+                            const planePos = intersect.object.position;
+                        
+                            console.log(planePos);
+
+                            createPlane(planePos);
+
+                            scene.remove(intersect.object);
+                            const index = planeSelectors.indexOf(intersect.object);
+                            if(index > -1) planeSelectors.splice(index,1);
+
+                            break;
+                        case 2: //Middle click
+                            break;
+                        case 3: //Right click
+                            break;
+                    }
+
+                    break;
+            }
+        }
+
             switch(currentMouseMode)    //Master switch for mouse mode
             {
                 case mouseMode.areaDef:         //Area definition mode
                     
                     switch (event.which){   ////Mouse button switch 
                         case 1: //Left click area definition
-                        if (!outlineFinished) {
-        
-                            pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
-                            
-                            if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
-                            else raycaster.setFromCamera(pointer, camera);
-                            
-                            const intersects = raycaster.intersectObjects(collisionObjects);
+                            if (!outlineFinished) {
             
-                            if (intersects.length > 0) {    //If ray intersects with something
-            
-                                const intersect = intersects[0];
-                                if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
-    
-                                    let node;   //temp variable to store the gltf.scene object
-                                    new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
-                                        node = gltf.scene;      //gltf model assigned to node object
-                                        node.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
-                                            if(n.isMesh){
-                                                n.castShadow = true;
-                                                n.receiveShadow = true;
-                                            }
-                                        })
-    
-                                        node.scale.set(13,13,13);       //Increase scale
-                                        node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                                        if(world.plane.snapToGrid) node.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
-                                        scene.add(node);        //Add the node to the scene
-            
-                                        node.name = "node " + nodeID;   //Give the node a name with the id
-                                        nodeID++;       //increment id 
-                                        nodes.push(node);               //Push node to the array of nodes
-                                        console.log("Pushed outline node:" + node.name);
-    
-                                        const pos = node.position;     //temp variable to store the point
-                                        outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
-                                        console.log("Added outlinePoint at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
-            
-                                        if (outlinePoints.length > 1) { drawLine(); }         //if there is more than one point, draw a line between them
+                                pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+                                
+                                if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                                else raycaster.setFromCamera(pointer, camera);
+                                
+                                const intersects = raycaster.intersectObjects(collisionObjects);
                 
-                                        if (outlinePoints.length == 4) { finalOutline(); }    //Finishes the outline on four points
-                                    });
+                                if (intersects.length > 0) {    //If ray intersects with something
+                
+                                    const intersect = intersects[0];
+                                    if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
+        
+                                        spawnNode(intersect);
+                                    }
                                 }
                             }
-                        }
                             break;
                         case 2: //Middle click area definition
                             break;
@@ -1185,7 +1274,7 @@ function onPointerDown(event) {
                             break;
                     }
                     
-                break;
+                    break;
                 case mouseMode.objectPlace:     //Object placing mode
         
                 switch (event.which){   ////Mouse button switch 
@@ -1193,7 +1282,7 @@ function onPointerDown(event) {
 
                         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);   //Pointer is the mouse position on the screen as a vec2
                         
-                        if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                         else raycaster.setFromCamera(pointer, camera);
 
                         const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
@@ -1202,42 +1291,8 @@ function onPointerDown(event) {
                             const intersect = intersects[0];
                             console.log("col with obj: "+intersect.object.name);
                             if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
-                                let placableObject;   //temp variable to store the gltf.scene object
-        
-                                new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads the current selected model
-                                    placableObject = gltf.scene;      //gltf model assigned to temp variable
-                                    placableObject.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
-                                        if(n.isMesh){
-                                            n.castShadow = true;
-                                            n.receiveShadow = true;
-                                        }
-                                    })
-                                    placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-                                    placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y, objectRolloverMesh.position.z);    //Offset so objects aren't floating
-        
-                                    if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
-                                    placableObject.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
-                                    placableObject.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
-                                    scene.add(placableObject);        //Add the object to the scene
-        
-                                    placableObject.name = currentObject;
-        
-                                    if(placableObject.name == "Pot" || placableObject.name == "Square raised"){                                    
-                                        placableObject.traverse(n=>{
-                                            if(n.isMesh){ 
-                                                collisionObjects.push(n);
-                                                n.name = currentObject;
-                                            }
-                                        })
-    
-                                        console.log("Pushed object:" + placableObject.name + " to collisionObjects");
-                                    } 
-                                    else {
-                                        placedObjects.push(placableObject);               //if obj is not to be collided with, add to array of objs
-                                        console.log("Pushed object:" + placableObject.name + " to placedObjects");
-                                    }
-                                    spawnSound.play();
-                                });
+                                
+                                spawnObject(intersect);
                             }
                             if(isMoving) {
                                 changeMouseMode(mouseMode.objectMove); 
@@ -1260,7 +1315,7 @@ function onPointerDown(event) {
         
                         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                         
-                        if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                         else raycaster.setFromCamera(pointer, camera);
         
                         const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
@@ -1295,7 +1350,7 @@ function onPointerDown(event) {
         
                         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                         
-                        if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                         else raycaster.setFromCamera(pointer, camera);
         
                         const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
@@ -1318,7 +1373,6 @@ function onPointerDown(event) {
                             deleteSound.play();
                             ////Removed the object, get the object and set to place mode
         
-        
                             changeMouseMode(mouseMode.objectPlace);
                             isMoving = true;
                         }
@@ -1330,36 +1384,95 @@ function onPointerDown(event) {
                         break;
                 }
                     break;
-                case mouseMode.newPlane:
-
-                switch(event.which){
-                    case 1: //Left click
-
-                    pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);   //Pointer is the mouse position on the screen as a vec2
-                        
-                    if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
-                    else raycaster.setFromCamera(pointer, camera);
-
-                    const intersects = raycaster.intersectObjects(planeSelectors); //objects[] contains the plane
-                    if(intersects.length >0){
-                        const intersect = intersects[0];
-                        const planePos = intersect.object.position;
-                        console.log(planePos);
-
-                        createPlane(planePos);
-
-                        scene.remove(intersect.object);
-                        const index = planeSelectors.indexOf(intersect.object);
-                        if(index > -1) planeSelectors.splice(index,1);
-                    }    
-
-                        break;
-                }
-                    break;
             }
     }
     
-    if(isFirstPerson && canInteract) orbitControls.lock();
+    if(isFirstPerson && canInteract) controls.lock();
+}
+
+function spawnNode(intersect){
+
+    let node;   //temp variable to store the gltf.scene object
+    new GLTFLoader().load('models/markerpost.gltf', function(gltf){ //gltf loader loads marker post model
+        node = gltf.scene;      //gltf model assigned to node object
+        node.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
+            if(n.isMesh){
+                n.castShadow = true;
+                n.receiveShadow = true;
+            }
+        })
+
+        node.scale.set(13,13,13);       //Increase scale
+        node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+        if(world.plane.snapToGrid) node.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
+        scene.add(node);        //Add the node to the scene
+
+        node.name = "node " + nodeID;   //Give the node a name with the id
+        nodeID++;       //increment id 
+        nodes.push(node);               //Push node to the array of nodes
+        console.log("Pushed outline node:" + node.name);
+
+        const pos = node.position;     //temp variable to store the point
+        outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
+        console.log("Added outlinePoint at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
+
+        if (outlinePoints.length > 1) { drawLine(); }         //if there is more than one point, draw a line between them
+
+        if (outlinePoints.length == 4) { finalOutline(); }    //Finishes the outline on four points
+    });
+}
+
+function spawnObject(intersect){
+
+    let placableObject;   //temp variable to store the gltf.scene object
+                                
+    new GLTFLoader().load(currentObjectPath, function(gltf){ //gltf loader loads the current selected model
+        placableObject = gltf.scene;      //gltf model assigned to temp variable
+        placableObject.traverse(n =>{       //Sets all the meshes in the object to cast and recieve shadows
+            if(n.isMesh){
+                n.castShadow = true;
+                n.receiveShadow = true;
+            }
+        })
+
+        console.log(placableObject);
+
+        placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
+        placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y, objectRolloverMesh.position.z);    //Offset so objects aren't floating
+    
+        if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
+        placableObject.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
+        placableObject.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
+        scene.add(placableObject);        //Add the object to the scene
+    
+        placableObject.name = currentObject;
+    
+        if(placableObject.name == "Pot" || placableObject.name == "Square raised"){                                    
+            placableObject.traverse(n=>{
+                if(n.isMesh){ 
+                    collisionObjects.push(n);
+                    n.name = currentObject;
+                }
+            })
+    
+            console.log("Pushed object:" + placableObject.name + " to collisionObjects");
+        } 
+        else {
+            placedObjects.push(placableObject);               //if obj is not to be collided with, add to array of objs
+            console.log("Pushed object:" + placableObject.name + " to placedObjects");
+        }
+        spawnSound.play();
+
+        /*const objDiv = document.createElement('div');
+        objDiv.className = 'label';
+        objDiv.textContent = 'pos';
+        objDiv.style.marginTop = '-1em';
+        const objLabel = new CSS2DObject(objDiv);
+        objLabel.position.set(placableObject.position);
+        placableObject.add(objLabel);*/
+    });
+
+
 }
 
 function onDocumentKeyDown(event) {
@@ -1465,16 +1578,16 @@ function onDocumentKeyUp(event) {
 
 function animate() {
 
-    
+    requestAnimationFrame(animate);
 
     ///////Camera////////////
-    if(!isFirstPerson) orbitControls.update();   //Controls.update() is only for orbit controls
+    if(!isFirstPerson) controls.update();   //Controls.update() is only for orbit controls
     else{       //First person code
         const time = performance.now();
         
-        if(orbitControls.isLocked)
+        if(controls.isLocked)
         {
-            fpRaycaster.ray.origin.copy(orbitControls.getObject().position);
+            fpRaycaster.ray.origin.copy(controls.getObject().position);
             fpRaycaster.ray.origin.y -= 10;
 
             const intersections = fpRaycaster.intersectObjects(collisionObjects);
@@ -1498,17 +1611,17 @@ function animate() {
                 canJump = true;
             }
 
-            orbitControls.moveRight(-velocity.x *delta);
-            orbitControls.moveForward(-velocity.z * delta);
-            orbitControls.getObject().position.y += (velocity.y * delta);
+            controls.moveRight(-velocity.x *delta);
+            controls.moveForward(-velocity.z * delta);
+            controls.getObject().position.y += (velocity.y * delta);
 
-            if(orbitControls.getObject().position.y < 10){
+            if(controls.getObject().position.y < 10){
                 velocity.y = 0;
-                orbitControls.getObject().position.y = 10;
+                controls.getObject().position.y = 10;
                 canJump = true;
             }
 
-            if(orbitControls.getObject().position.y < -100) orbitControls.getObject().position = new THREE.Vector3(0,10,0);
+            if(controls.getObject().position.y < -100) controls.getObject().position = new THREE.Vector3(0,10,0);
         }
 
         prevTime = time;
@@ -1585,13 +1698,14 @@ function animate() {
         }
     }
 
-    requestAnimationFrame(animate);
+    
     render();
 }
 animate();
 
 function render(){
     renderer.render(scene, camera);
+    //labelRenderer.render(scene,camera);
 }
 
 function incrementDays(timestamp){
