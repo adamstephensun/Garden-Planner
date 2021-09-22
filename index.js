@@ -31,7 +31,7 @@ let prevTime, fpRaycaster;
 let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = new Boolean;
 let velocity, direction;
 
-let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox, timeBox;
+let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
 let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls;
 
@@ -550,9 +550,6 @@ function init() {
     controlsBox1 = document.getElementById("controls-box");
     controlsBox2 = document.getElementById("controls-box-2");
 
-    //////Time box//////
-    timeBox = document.getElementById("time-box");
-
     //////Toggle cam button////
     toggleCamButton = document.getElementById("toggle-cam");
     toggleCamButton.addEventListener('click', function(){
@@ -590,8 +587,6 @@ function init() {
 
 
     //#endregion HTML
-
-    initTimer();
 }
 
 function createPlane(pos){
@@ -648,16 +643,6 @@ function createPlane(pos){
     planeSelectors.push(planeSelectorMeshBottom);
     
     planeID++;
-}
-
-function initTimer()
-{
-    console.log("timer initialised");
-    timer = new easytimer.Timer();
-    timer.start({precision: 'secondTenths'});
-    timer.addEventListener('secondsUpdated', function(){
-        document.getElementById("time-seconds").innerHTML =timer.getTimeValues().toString();
-    })
 }
 
 function changeCamera(fp){
@@ -1448,6 +1433,7 @@ function render() {
 
     requestAnimationFrame(render);
 
+    ///////Camera////////////
     if(!isFirstPerson) controls.update();   //Controls.update() is only for orbit controls
     else{       //First person code
         const time = performance.now();
@@ -1494,6 +1480,7 @@ function render() {
         prevTime = time;
     }
 
+    ////////Sun cycle/////////////
     if(world.lights.sunCycleActive && !world.lights.flatLighting)     //If the sun cycle is active
     {
         
@@ -1551,6 +1538,7 @@ function render() {
         ambiLight.visible = true;
     }
 
+    ////////Export timer/////////
     if(exportSuccess)   //Export confirm appears for a couple of seconds
     {
         confirmExport.style.visibility = "visible";
