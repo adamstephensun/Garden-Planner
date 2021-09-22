@@ -6,9 +6,10 @@ import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.m
 import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js";
 import { GLTFExporter } from "https://unpkg.com/three@0.126.1/examples/jsm/exporters/GLTFExporter.js";
 import { PointerLockControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/PointerLockControls.js"; 
+import { TransformControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/TransformControls.js";
 
 //#region declarations
-let camera, listener, scene, renderer, controls, gui, world;
+let camera, listener, scene, renderer, orbitControls, transformControls, gui, world;
 let hemiLight, sunLight, moonLight, pointLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
 let planeMesh, planeSelectorGeo, planeID;
@@ -128,7 +129,6 @@ function init() {
     ambiLight = new THREE.AmbientLight(0xffa95c);
     scene.add(ambiLight);
     ambiLight.visible = false;
-    //pointLight = new THREE.PointLight(0xffa95c, 1, 100); //Dir light for when flat lighting is checked
 
     sunLight = new THREE.SpotLight(0xffa95c,1);
     sunLight.castShadow = true;
@@ -458,7 +458,23 @@ function init() {
     gridGeo = new THREE.PlaneGeometry(100,100);
     
     planeID = 0;
-    createPlane(new THREE.Vector3());
+    //createPlane(new THREE.Vector3());
+
+    //console.log("New plane at x:"+pos.x+"  z:"+pos.z);
+    planeMesh = new THREE.Mesh(planeGeo, grassMaterial);
+    planeMesh.castShadow = false;
+    planeMesh.receiveShadow = true;
+    planeMesh.name = "plane " + planeID;
+    //planeMesh.position.x = pos.x;
+    //planeMesh.position.z = pos.z;
+    scene.add(planeMesh);
+    collisionObjects.push(planeMesh);
+    
+    gridMesh = new THREE.Mesh(gridGeo, gridMaterial);
+    gridMesh.rotateX(- Math.PI / 2);
+    gridMesh.position.set(0,0.555,0);
+    gridMesh.name = "Grid "+planeID;
+    scene.add(gridMesh);
 
     //#endregion plane & grid
 
@@ -475,6 +491,7 @@ function init() {
 
     //#region assignments and loaders
 
+    ////////Assignments////////
     outlineFinished = false;    //For area creation
     nodeID = 0;                 //Area creation
     areaID = 0;                 //Area creation
@@ -484,6 +501,7 @@ function init() {
     confirmExportTimer = 0;     //Timer for export confirm html message
     canInteract = true;         //Bool to determine if the player can interact with the js scene
 
+    ////////First person////////
     prevTime = performance.now();       //Used for movement
     fpRaycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3(0,-1,0), 0,0.1);  //Groundcheck
     velocity = new THREE.Vector3(0,0,0);
@@ -494,9 +512,11 @@ function init() {
     moveLeft = false;
     moveRight = false;
 
+    ///////Exporter///////
     exporter = new GLTFExporter();
     exportSuccess = false;  //Flag for confim animation
 
+    /////////Time/////////
     clock = new THREE.Clock(true);  //Clock for animation
     skyColour = new THREE.Color(0.980, 0.929, 0.792);   //Default sky colour, light yellow
     dayFlag = false;
@@ -504,6 +524,20 @@ function init() {
     days = 0;
     
     changeCamera(isFirstPerson);
+
+    ////////Transform controls///////
+    transformControls = new TransformControls(camera, renderer.domElement);
+    transformControls.addEventListener('change', animate);
+    transformControls.addEventListener('dragging-changed', function(event){
+        orbitControls.enabled = !event.value;
+    })
+
+    transformControls.showY = false;
+    transformControls.setMode('scale');
+
+    transformControls.attach(planeMesh);
+    scene.add(transformControls);
+    
     loadAudio();
     loadFlagRollover();
     
@@ -654,19 +688,19 @@ function changeCamera(fp){
         camera.position.set(50, 80, 130);   //Set the initial position
         camera.lookAt(0, 0, 0);             //Make the camera look at the origin (position of the plane)
     
-        controls = new OrbitControls(camera, renderer.domElement);  //Create the camera orbit controls
+        orbitControls = new OrbitControls(camera, renderer.domElement);  //Create the camera orbit controls
     
-        controls.listenToKeyEvents(window); // optional
+        orbitControls.listenToKeyEvents(window); // optional
     
-        controls.keyPanSpeed = 0;       //Disables key panning but allows panning with middle mouse
-        controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
-        controls.dampingFactor = 0.05;
-        controls.screenSpacePanning = false;
-        controls.minDistance = 10;      //Min and max zoom distances
-        controls.maxDistance = 1500;
+        orbitControls.keyPanSpeed = 0;       //Disables key panning but allows panning with middle mouse
+        orbitControls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
+        orbitControls.dampingFactor = 0.05;
+        orbitControls.screenSpacePanning = false;
+        orbitControls.minDistance = 10;      //Min and max zoom distances
+        orbitControls.maxDistance = 1500;
         //controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
     
-        controls.mouseButtons = {
+        orbitControls.mouseButtons = {
             MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
             RIGHT: THREE.MOUSE.ROTATE
         }
@@ -678,8 +712,8 @@ function changeCamera(fp){
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight,1,1000);
         camera.position.y = 10;
 
-        controls = new PointerLockControls(camera, document.body);
-        scene.add(controls.getObject());
+        orbitControls = new PointerLockControls(camera, document.body);
+        scene.add(orbitControls.getObject());
         document.getElementById("crosshair").style.visibility = "visible";
         document.getElementById("controls-fp").style.visibility = "visible";
     }
@@ -1103,7 +1137,7 @@ function onPointerDown(event) {
         
                             pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                             
-                            if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                            if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                             else raycaster.setFromCamera(pointer, camera);
                             
                             const intersects = raycaster.intersectObjects(collisionObjects);
@@ -1159,7 +1193,7 @@ function onPointerDown(event) {
 
                         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);   //Pointer is the mouse position on the screen as a vec2
                         
-                        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                        if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                         else raycaster.setFromCamera(pointer, camera);
 
                         const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
@@ -1226,7 +1260,7 @@ function onPointerDown(event) {
         
                         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                         
-                        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                        if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                         else raycaster.setFromCamera(pointer, camera);
         
                         const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
@@ -1261,7 +1295,7 @@ function onPointerDown(event) {
         
                         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
                         
-                        if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                        if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                         else raycaster.setFromCamera(pointer, camera);
         
                         const intersects = raycaster.intersectObjects(placedObjects, true); //placedObjects[] contains all placable objects
@@ -1303,7 +1337,7 @@ function onPointerDown(event) {
 
                     pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);   //Pointer is the mouse position on the screen as a vec2
                         
-                    if(isFirstPerson && controls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
+                    if(isFirstPerson && orbitControls.isLocked) raycaster.setFromCamera(new THREE.Vector2(), camera);     //When in first person, cast ray from center of screen (crosshair)
                     else raycaster.setFromCamera(pointer, camera);
 
                     const intersects = raycaster.intersectObjects(planeSelectors); //objects[] contains the plane
@@ -1325,7 +1359,7 @@ function onPointerDown(event) {
             }
     }
     
-    if(isFirstPerson && canInteract) controls.lock();
+    if(isFirstPerson && canInteract) orbitControls.lock();
 }
 
 function onDocumentKeyDown(event) {
@@ -1429,18 +1463,18 @@ function onDocumentKeyUp(event) {
     }
 }
 
-function render() {
+function animate() {
 
-    requestAnimationFrame(render);
+    
 
     ///////Camera////////////
-    if(!isFirstPerson) controls.update();   //Controls.update() is only for orbit controls
+    if(!isFirstPerson) orbitControls.update();   //Controls.update() is only for orbit controls
     else{       //First person code
         const time = performance.now();
         
-        if(controls.isLocked)
+        if(orbitControls.isLocked)
         {
-            fpRaycaster.ray.origin.copy(controls.getObject().position);
+            fpRaycaster.ray.origin.copy(orbitControls.getObject().position);
             fpRaycaster.ray.origin.y -= 10;
 
             const intersections = fpRaycaster.intersectObjects(collisionObjects);
@@ -1464,17 +1498,17 @@ function render() {
                 canJump = true;
             }
 
-            controls.moveRight(-velocity.x *delta);
-            controls.moveForward(-velocity.z * delta);
-            controls.getObject().position.y += (velocity.y * delta);
+            orbitControls.moveRight(-velocity.x *delta);
+            orbitControls.moveForward(-velocity.z * delta);
+            orbitControls.getObject().position.y += (velocity.y * delta);
 
-            if(controls.getObject().position.y < 10){
+            if(orbitControls.getObject().position.y < 10){
                 velocity.y = 0;
-                controls.getObject().position.y = 10;
+                orbitControls.getObject().position.y = 10;
                 canJump = true;
             }
 
-            if(controls.getObject().position.y < -100) controls.getObject().position = new THREE.Vector3(0,10,0);
+            if(orbitControls.getObject().position.y < -100) orbitControls.getObject().position = new THREE.Vector3(0,10,0);
         }
 
         prevTime = time;
@@ -1525,7 +1559,7 @@ function render() {
         
         scene.background = col;
 
-        if(sunSphere.position.y <= -15) sunSphere.visible = false;
+        if(sunSphere.position.y <= -15) sunSphere.visible = false;  //Hides the sun and moon when they go slightly below the plane
         else sunSphere.visible = true;
         if(moonSphere.position.y <= -15) moonSphere.visible = false;
         else moonSphere.visible = true;
@@ -1551,11 +1585,14 @@ function render() {
         }
     }
 
-    let start = Date.now();
+    requestAnimationFrame(animate);
+    render();
+}
+animate();
 
+function render(){
     renderer.render(scene, camera);
 }
-render();
 
 function incrementDays(timestamp){
     if(timestamp == clock.getElapsedTime()){
