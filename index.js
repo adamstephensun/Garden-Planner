@@ -96,8 +96,9 @@ const mouseMode = {
 
 let currentMouseMode = mouseMode.areaDef;
 
-let currentObject, currentObjectPath, isMoving, currentObjectScale, currentObjectRotation;
+let currentObject, currentObjectPath, isMoving, currentObjectScale, currentObjectRotation, currentObjectPosition;
 let upArrowDown, downArrowDown, rightArrowDown, leftArrowDown;
+let gridSectionGeo, gridSectionMat, dragCountX, dragCountZ;
 
 //#endregion declarations
 
@@ -469,12 +470,19 @@ function init() {
     confirmExportTimer = 0;     //Timer for export confirm html message
     canInteract = true;         //Bool to determine if the player can interact with the js scene
     objectRolloverActive = false;
+    currentObjectPosition = new THREE.Vector2();
 
     //////Controls//////
     upArrowDown = false;
     downArrowDown = false;
     rightArrowDown = false;
     leftArrowDown = false;
+
+    ///////Grid///////
+    gridSectionGeo = new THREE.PlaneGeometry(1,1);
+    gridSectionGeo.rotateX(- Math.PI / 2);
+    dragCountX = 0;
+    dragCountZ = 0;
 
     ////////First person////////
     prevTime = performance.now();       //Used for movement
@@ -620,6 +628,8 @@ function createPlane(pos){
     gridMesh.name = "Grid "+planeID;
     scene.add(gridMesh);
     planeMesh.add(gridMesh);
+
+
     
     dragMeshX = new THREE.Mesh(dragGeo, flagRollOverMaterial);
     dragMeshX.position.x = world.plane.width /2 + 5;
@@ -657,7 +667,7 @@ function changeCamera(fp){
         controls.screenSpacePanning = false;
         controls.minDistance = 10;      //Min and max zoom distances
         controls.maxDistance = 1500;
-        //controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
+        controls.maxPolarAngle = Math.PI / 2.3;     //Restricts the cameras vertical rotation so you cant see under the plane
     
         controls.mouseButtons = {
             MIDDLE: THREE.MOUSE.PAN,  //Changed controls because left mouse is used for manipulating objects
@@ -988,6 +998,13 @@ function loadTextures() {
     })
 
     gridTexture = new THREE.TextureLoader().load("textures/grid.png");
+
+    gridSectionMat = new THREE.MeshBasicMaterial({ 
+        color: 0xdddddd,
+        map: gridTexture,
+        transparent: true
+     })
+
     gridTexture.wrapS = THREE.RepeatWrapping;
     gridTexture.wrapT = THREE.RepeatWrapping;
     gridTexture.repeat.set(20, 20);
@@ -997,6 +1014,7 @@ function loadTextures() {
         map: gridTexture,
         transparent: true
     })
+
     
     /////Other mats/////
     
@@ -1066,6 +1084,10 @@ function onPointerMove(event) {
                     objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
                     objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
                     objectRolloverMesh.position.y -= 1; 
+
+                    currentObjectPosition.x = objectRolloverMesh.position.x;
+                    currentObjectPosition.y = objectRolloverMesh.position.z;
+                    console.log("Pos x:"+currentObjectPosition.x+"  y:"+currentObjectPosition.y);
                     
                     break;
                 case mouseMode.objectRemove:
@@ -1094,11 +1116,32 @@ function onPointerMove(event) {
             mouseDeltaX = mouseX - lastMouseX;
             mouseDeltaY = mouseY - lastMouseY;
     
-            var xFactor = Math.sign(mouseDeltaX)/1.5;
-            var zFactor = Math.sign(mouseDeltaY)/1.5;
+            var xFactor = Math.sign(mouseDeltaX);
+            var zFactor = Math.sign(mouseDeltaY);
+            
+            if(currentDragX) {
+                if(xFactor > 0) {
+                    dragCountX++;
+                    if(dragCountX % 5 == 0) planeScale.x += 0.1;
+                }
+                if(xFactor < 0){
+                    dragCountX--;
+                    if(dragCountX % 5 ==0) planeScale.x -= 0.1;
+                }
+                console.log("plane width x:"+planeMesh.scale.x.toFixed(1));
 
-            if(currentDragX) planeScale.x = planeMesh.scale.x + xFactor /25;
-            else planeScale.z = planeMesh.scale.z + zFactor / 25;
+            }
+            else{
+                if(zFactor > 0){
+                    dragCountZ++;
+                    if(dragCountZ % 5 == 0) planeScale.z += 0.1;
+                }
+                if(zFactor < 0){
+                    dragCountZ--;
+                    if(dragCountZ % 5 == 0) planeScale.z -= 0.1;
+                }
+                console.log("plane height z:"+planeMesh.scale.z.toFixed(1));
+            }
             
             var childScale = new THREE.Vector3(1 / planeMesh.scale.x, 1 / planeMesh.scale.y, 1 / planeMesh.scale.z);
             dragMeshX.scale.set(childScale.x, childScale.y, childScale.z);      //Prevents gizmo from scaling with the plane
@@ -1117,6 +1160,8 @@ function onPointerMove(event) {
             
             if(planeMesh.scale.z > maxPlaneScale) planeMesh.scale.set(planeMesh.scale.x, planeMesh.scale.y, maxPlaneScale);
             if(planeMesh.scale.z < minPlaneScale) planeMesh.scale.set(planeMesh.scale.x, planeMesh.scale.y, minPlaneScale);
+
+            console.log("plane width x:"+planeMesh.scale.x.toFixed(3));
         }
     }
 
@@ -1297,7 +1342,8 @@ function onPointerUp(event){
     if(canInteract){
         console.log("release");
         dragFlag = false;
-
+        dragCountX = 0;
+        dragCountZ = 0;
     }
 }
 
