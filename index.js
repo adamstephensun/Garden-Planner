@@ -11,7 +11,7 @@ import { PointerLockControls } from "https://unpkg.com/three@0.126.1/examples/js
 let camera, listener, scene, renderer, controls, gui, world;
 let hemiLight, sunLight, moonLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
-let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos;
+let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos, oldSection;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
 let dragGeo, dragMeshX, dragMeshZ;
@@ -35,7 +35,7 @@ let velocity, direction;
 
 let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
-let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls;
+let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls, notif, notifFlag, planeChangeTimer, posPopup;
 
 let timer, sunStartPos, days;
 let dayFlag = new Boolean;
@@ -406,8 +406,20 @@ function init() {
         }
         collisionObjects.push(planeMesh);
     });
-    planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{ gridMesh.visible = world.plane.grid; })
-    planeFolder.add(world.plane, "snapToGrid").name("Snap to grid");
+    planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{ 
+        gridSections.forEach(element => {
+            element.visible = world.plane.grid;
+        });
+
+        notifFlag = true;
+        if(world.plane.grid) notif.innerHTML = "Grid enabled";
+        else notif.innerHTML = "Grid disabled";
+     })
+    planeFolder.add(world.plane, "snapToGrid").name("Snap to grid").onChange(()=>{
+        notifFlag = true;
+        if(world.plane.snapToGrid) notif.innerHTML = "Grid snapping enabled";
+        else notif.innerHTML = "Grid snapping disabled";
+    });
     planeFolder.open();
 
     addRestOfGUI();
@@ -437,6 +449,7 @@ function init() {
 
     gridSquareNum = 10;
     gridSquareID = 0;
+    notifFlag = false;
 
     gridSquareGeo = new THREE.PlaneGeometry((world.plane.width / gridSquareNum) / 2, (world.plane.height / gridSquareNum) / 2);
     gridSquareGeo.rotateX(-Math.PI / 2);
@@ -445,6 +458,10 @@ function init() {
 
     planeID = 0;
     planeScale = new THREE.Vector3(1,1,1);
+
+    //////Plane change notif//////
+    notif = document.getElementById("notif");
+    notif.style.visibility = 'hidden';
 
     createPlane(new THREE.Vector3());
 
@@ -474,6 +491,7 @@ function init() {
     isMoving = false;           //Flag for moving placableobject
     gridSnapFactor = 5;         //Factor for size of grid snapping
     confirmExportTimer = 0;     //Timer for export confirm html message
+    planeChangeTimer= 0;
     canInteract = true;         //Bool to determine if the player can interact with the js scene
     objectRolloverActive = false;
     currentObjectPosition = new THREE.Vector2();
@@ -487,7 +505,6 @@ function init() {
     ///////Grid///////
     dragCountX = 0;
     dragCountZ = 0;
-    
 
     ////////First person////////
     prevTime = performance.now();       //Used for movement
@@ -507,7 +524,7 @@ function init() {
     mouseDeltaY = 0;
     lastMouseX = 0;
     lastMouseY = 0;
-    maxPlaneScale = 3.5;
+    maxPlaneScale = 2.5;
     minPlaneScale = 0.3;
     planeScale = new THREE.Vector3(1,1,1);
 
@@ -584,6 +601,10 @@ function init() {
     //////Crosshair//////
     crosshair = document.getElementById("crosshair");
 
+    /////Pos popup//////
+    posPopup = document.getElementById("pos-popup");
+    posPopup.style.visibility = "hidden";
+
     /////disabling interaction when hovering on UI elements
     infoBox = document.getElementById("info-box");
     infoBox.addEventListener('mouseenter', function(){ canInteract = false; })  //Top left info box
@@ -625,19 +646,8 @@ function createPlane(pos){
     console.log(planeScale);
     scene.add(planeMesh);
     collisionObjects.push(planeMesh);
-    
-    gridMesh = new THREE.Mesh(gridGeo, gridMaterial);
-    gridMesh.rotateX(- Math.PI / 2);
-    //gridMesh.position.set(pos.x,pos.y +0.555,pos.z);
-    gridMesh.position.y += 0.555;
-    gridMesh.name = "Grid "+planeID;
-    //scene.add(gridMesh);
-    //planeMesh.add(gridMesh);
 
     updateGrid(false);
-
-
-
     
     dragMeshX = new THREE.Mesh(dragGeo, flagRollOverMaterial);
     dragMeshX.position.x = world.plane.width /2 + 5;
@@ -689,6 +699,8 @@ function updateGrid(clearCurrent){
             //console.log(gridSquareMesh.name + "spawned at x:"+gridSquareMesh.position.x+"  y:"+gridSquareMesh.position.y+"  z:"+gridSquareMesh.position.z);
         }
     }
+
+
 
     console.log("grid complete with "+count+" sections")
 
@@ -750,7 +762,11 @@ function changeCamera(fp){
 function addRestOfGUI(){
     const lightFolder = gui.addFolder("Lighting");
     lightFolder.add(world.lights, "timeScale", 1,10, 1).name("Orbit speed");
-    lightFolder.add(world.lights, "sunCycleActive").name("Sun cycle");
+    lightFolder.add(world.lights, "sunCycleActive").name("Sun cycle").onChange(()=>{
+        notifFlag = true;
+        if(world.lights.sunCycleActive) notif.innerHTML = "Sun cycle enabled";
+        else notif.innerHTML = "Sun cycle disabled";
+    });
     lightFolder.add(world.lights, "flatLighting").name("Flat lighting").onChange(()=>{
         sunLight.visible = !world.lights.flatLighting;
         moonLight.visible = !world.lights.flatLighting;
@@ -762,6 +778,10 @@ function addRestOfGUI(){
             scene.background = skyColour;
         }
         else hemiLight.intensity = 0.3;
+
+        notifFlag = true;
+        if(world.lights.flatLighting) notif.innerHTML = "Flat lighting enabled";
+        else notif.innerHTML = "Flat lighting disabled";
     } );
 
     const areaFolder = gui.addFolder("Area");       //Area folder added
@@ -1119,6 +1139,16 @@ function onPointerMove(event) {
         if(isFirstPerson) raycaster.setFromCamera(new THREE.Vector2(), camera);
         else raycaster.setFromCamera(pointer, camera);
 
+        //////Intersection for grid///////
+        const gridIntersects = raycaster.intersectObjects(gridSections);
+
+        if(gridIntersects.length > 0)
+        {
+            const intersect = gridIntersects[0];
+            currentGridpos = new THREE.Vector3(intersect.object.position.x, intersect.object.position.y, intersect.object.position.z);
+        }
+
+        /////Intersection for mouse modes//////
         const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
     
         if (intersects.length > 0) {
@@ -1129,7 +1159,14 @@ function onPointerMove(event) {
                 case mouseMode.areaDef:
                     flagRollOverMesh.visible = true;
                     flagRollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
-                    if(world.plane.snapToGrid) flagRollOverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
+                    if(world.plane.snapToGrid){
+                        flagRollOverMesh.position.x = currentGridpos.x;
+                        flagRollOverMesh.position.z = currentGridpos.z;
+                    } 
+
+                    posPopup.style.visibility = "visible";
+                    posPopup.innerHTML = "x:"+(flagRollOverMesh.position.x).toFixed(1)+"cm  y:"+(flagRollOverMesh.position.z).toFixed(1)+"cm";
+
                     break;
                 case mouseMode.objectPlace:
                     flagRollOverMesh.visible = false;
@@ -1137,11 +1174,13 @@ function onPointerMove(event) {
                     objectRolloverActive = true;
     
                     objectRolloverMesh.position.copy(intersect.point).add(intersect.face.normal);
-                    //if(world.plane.snapToGrid) objectRolloverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
                     if(world.plane.snapToGrid){
                     objectRolloverMesh.position.x = currentGridpos.x;
                     objectRolloverMesh.position.z = currentGridpos.z;
                     }       
+
+                    posPopup.style.visibility = "visible";
+                    posPopup.innerHTML = "x:"+objectRolloverMesh.position.x+"cm  y:"+objectRolloverMesh.position.z+"cm";
 
                     objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
                     objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
@@ -1167,22 +1206,10 @@ function onPointerMove(event) {
         else{
             if(flagRollOverMesh != null) flagRollOverMesh.visible = false;      //Removes the rollover mesh when the pointer isnt in a valid position
             if(objectRolloverMesh != null) objectRolloverMesh.visible = false;
+            posPopup.style.visibility = "hidden";
         }
 
-        //////Intersection for grid///////
-        const gridIntersects = raycaster.intersectObjects(gridSections);
 
-        if(gridIntersects.length > 0)
-        {
-            const intersect = gridIntersects[0];
-
-            currentGridpos = new THREE.Vector3(intersect.object.position.x, intersect.object.position.y, intersect.object.position.z);
-            
-            console.log("Grid pos"+currentGridpos.x+"  "+currentGridpos.z);
-            intersect.object.material = flagRollOverMaterial;
-            const originalObj = intersect.object;
-            if(intersect != originalObj) originalObj.material = gridSquareMat;
-        }
 
         ///////Plane drag///////
         
@@ -1206,7 +1233,8 @@ function onPointerMove(event) {
                     if(dragCountX % 5 ==0) planeScale.x -= 0.1;
                 }
                 console.log("plane width x:"+planeMesh.scale.x.toFixed(1));
-
+                notifFlag = true;
+                notif.innerHTML = "Garden width: "+(planeMesh.scale.x.toFixed(1) * 100).toFixed(1)+"cm";
             }
             else{
                 if(zFactor > 0){
@@ -1218,6 +1246,8 @@ function onPointerMove(event) {
                     if(dragCountZ % 5 == 0) planeScale.z -= 0.1;
                 }
                 console.log("plane height z:"+planeMesh.scale.z.toFixed(1));
+                notifFlag = true;
+                notif.innerHTML = "Garden height: "+(planeMesh.scale.z.toFixed(1) * 100).toFixed(1)+"cm";
             }
             
             var childScale = new THREE.Vector3(1 / planeMesh.scale.x, 1 / planeMesh.scale.y, 1 / planeMesh.scale.z);
@@ -1438,7 +1468,7 @@ function spawnNode(intersect){
 
         node.scale.set(13,13,13);       //Increase scale
         node.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
-        if(world.plane.snapToGrid) node.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
+        if(world.plane.snapToGrid) node.position.x = currentGridpos.x; node.position.z = currentGridpos.z;   //Adds grid snapping if checked
         scene.add(node);        //Add the node to the scene
 
         node.name = "node " + nodeID;   //Give the node a name with the id
@@ -1450,9 +1480,13 @@ function spawnNode(intersect){
         outlinePoints.push(new THREE.Vector3(pos.x, pos.y, pos.z)); //Push a new point to the outline points array
         console.log("Added outlinePoint at x:" + pos.x.toFixed(2) + "  y:" + pos.y.toFixed(2) + "  z:" + pos.x.toFixed(2));
 
+        notifFlag = true;
+        notif.innerHTML = "Flag placed at x:"+node.position.x+"cm  y:"+node.position.z+"cm";
+
         if (outlinePoints.length > 1) { drawLine(); }         //if there is more than one point, draw a line between them
 
         if (outlinePoints.length == 4) { finalOutline(); }    //Finishes the outline on four points
+
     });
 }
 
@@ -1753,6 +1787,18 @@ function animate() {
         }
     }
 
+    ////////Plane change notif////
+    if(notifFlag){
+        notif.style.visibility = 'visible';
+        planeChangeTimer += clock.getDelta();
+
+        if(planeChangeTimer > 0.007){
+            notif.style.visibility = 'hidden';
+            notifFlag = false;
+            planeChangeTimer = 0;
+        }
+    }
+
     updateScaleAndRotation();
 
     render();
@@ -1816,6 +1862,9 @@ function finalOutline() {
         areaMesh.position.y -= 0.95 - areaHeightOffset; //Makes the area level (just above) the plane
         areaHeightOffset += 0.005;  //Height offset is increased slightly each area generated to avoid z fighting
 
+        notifFlag = true;
+        notif.innerHTML = "Area created";
+
         console.log(areas);
 
         changeMouseMode(mouseMode.none);
@@ -1825,6 +1874,8 @@ function finalOutline() {
             console.log("Removed element: " + i.toString());
             scene.remove(scene.getObjectByName("node "+i));
         }
+
+        
     }
     nodeID = 0; //Reset the node id counter so the next set of nodes can be deleted
     scene.remove(scene.getObjectByName("outline"));
@@ -1887,6 +1938,8 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = none";
 
+            notifFlag = true;
+            notif.innerHTML = "No tool selected";
             break;
         case mouseMode.areaDef:
             currentMouseMode = mouseMode.areaDef;
@@ -1895,6 +1948,8 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = create area";
             
+            notifFlag = true;
+            notif.innerHTML = "Tool selected: Create area";
             break;
         case mouseMode.objectPlace:
             currentMouseMode = mouseMode.objectPlace;
@@ -1902,6 +1957,8 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = place object";
 
+            notifFlag = true;
+            notif.innerHTML = "Tool selected: Place object";
             break;
         case mouseMode.objectRemove:
             currentMouseMode = mouseMode.objectRemove;
@@ -1909,6 +1966,8 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = remove object";
 
+            notifFlag = true;
+            notif.innerHTML = "Tool selected: Remove object";
             break;
         case mouseMode.objectMove:
             currentMouseMode = mouseMode.objectMove;
@@ -1916,6 +1975,8 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = move object";
 
+            notifFlag = true;
+            notif.innerHTML = "Tool selected: Move object";
             break;
     }
 
