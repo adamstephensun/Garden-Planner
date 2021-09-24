@@ -11,7 +11,7 @@ import { PointerLockControls } from "https://unpkg.com/three@0.126.1/examples/js
 let camera, listener, scene, renderer, controls, gui, world;
 let hemiLight, sunLight, moonLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
-let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos, oldSection;
+let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos, selectedSection;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
 let dragGeo, dragMeshX, dragMeshZ;
@@ -453,6 +453,8 @@ function init() {
 
     gridSquareGeo = new THREE.PlaneGeometry((world.plane.width / gridSquareNum) / 2, (world.plane.height / gridSquareNum) / 2);
     gridSquareGeo.rotateX(-Math.PI / 2);
+
+    selectedSection = new THREE.Object3D();
 
     currentPlaneMat = grassMaterial;
 
@@ -1140,13 +1142,25 @@ function onPointerMove(event) {
         else raycaster.setFromCamera(pointer, camera);
 
         //////Intersection for grid///////
-        const gridIntersects = raycaster.intersectObjects(gridSections);
+        if(world.plane.grid){
+            const gridIntersects = raycaster.intersectObjects(gridSections);
 
-        if(gridIntersects.length > 0)
-        {
-            const intersect = gridIntersects[0];
-            currentGridpos = new THREE.Vector3(intersect.object.position.x, intersect.object.position.y, intersect.object.position.z);
+            if(gridIntersects.length > 0)
+            {
+                const intersect = gridIntersects[0];
+                currentGridpos = new THREE.Vector3(intersect.object.position.x, intersect.object.position.y, intersect.object.position.z);
+    
+                intersect.object.material = flagRollOverMaterial;
+                console.log("sel:"+selectedSection.name+"    int:"+intersect.object.name)
+                if(intersect.object.name != selectedSection.name){
+                    selectedSection.material = gridSquareMat;
+                    console.log("match");
+                }
+                    
+                selectedSection = intersect.object;
+            }
         }
+
 
         /////Intersection for mouse modes//////
         const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
@@ -1188,7 +1202,6 @@ function onPointerMove(event) {
 
                     currentObjectPosition.x = objectRolloverMesh.position.x;
                     currentObjectPosition.y = objectRolloverMesh.position.z;
-                    console.log("Pos x:"+currentObjectPosition.x+"  y:"+currentObjectPosition.y);
                     
                     break;
                 case mouseMode.objectRemove:
@@ -1208,8 +1221,6 @@ function onPointerMove(event) {
             if(objectRolloverMesh != null) objectRolloverMesh.visible = false;
             posPopup.style.visibility = "hidden";
         }
-
-
 
         ///////Plane drag///////
         
@@ -1231,10 +1242,8 @@ function onPointerMove(event) {
                 if(xFactor < 0){
                     dragCountX--;
                     if(dragCountX % 5 ==0) planeScale.x -= 0.1;
-                }
-                console.log("plane width x:"+planeMesh.scale.x.toFixed(1));
-                notifFlag = true;
-                notif.innerHTML = "Garden width: "+(planeMesh.scale.x.toFixed(1) * 100).toFixed(1)+"cm";
+                }                
+                notification("Garden width: "+(planeMesh.scale.x.toFixed(1) * 100).toFixed(1)+"cm");
             }
             else{
                 if(zFactor > 0){
@@ -1244,10 +1253,8 @@ function onPointerMove(event) {
                 if(zFactor < 0){
                     dragCountZ--;
                     if(dragCountZ % 5 == 0) planeScale.z -= 0.1;
-                }
-                console.log("plane height z:"+planeMesh.scale.z.toFixed(1));
-                notifFlag = true;
-                notif.innerHTML = "Garden height: "+(planeMesh.scale.z.toFixed(1) * 100).toFixed(1)+"cm";
+                }                
+                notification("Garden height: "+(planeMesh.scale.z.toFixed(1) * 100).toFixed(1)+"cm");
             }
             
             var childScale = new THREE.Vector3(1 / planeMesh.scale.x, 1 / planeMesh.scale.y, 1 / planeMesh.scale.z);
@@ -1266,12 +1273,23 @@ function onPointerMove(event) {
             if(planeMesh.scale.z > maxPlaneScale) planeMesh.scale.set(planeMesh.scale.x, planeMesh.scale.y, maxPlaneScale);
             if(planeMesh.scale.z < minPlaneScale) planeMesh.scale.set(planeMesh.scale.x, planeMesh.scale.y, minPlaneScale);
 
-            console.log("plane width x:"+planeMesh.scale.x.toFixed(3));
-
             updateGrid(true);
+
+            objectGroundCheck();
         }
     }
+}
 
+function objectGroundCheck(){
+    placedObjects.forEach(element => {
+        const raycaster = new THREE.Raycaster(new THREE.Vector3(element.position.x, element.position.y+1, element.position.z), new THREE.Vector3(0,-1,0));
+        const intersects = raycaster.intersectObjects(gridSections);
+        console.log(intersects);
+        if(intersects.length == 0){
+            console.log("intersect obj:"+element.name);
+            scene.remove(element);
+        }
+    });
 }
 
 function onPointerDown(event) {
@@ -1292,7 +1310,6 @@ function onPointerDown(event) {
             if(intersect.object.name == "dragMeshX") currentDragX = true;
             else if(intersect.object.name == "dragMeshZ") currentDragX = false;
 
-            console.log("Drag X:"+currentDragX);
             dragFlag = true;
         }
         
@@ -1344,9 +1361,7 @@ function onPointerDown(event) {
 
                     switch(event.which){
                         case 1: //Left click
-    
-                        console.log("col with obj: "+intersect.object.name);
-                        if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
+                            if (collisionObjects.includes(intersect.object)){    //if intersect is included in the objects array
                             spawnObject(intersect);
                         }
     
@@ -1447,7 +1462,6 @@ function onPointerDown(event) {
 
 function onPointerUp(event){
     if(canInteract){
-        console.log("release");
         dragFlag = false;
         dragCountX = 0;
         dragCountZ = 0;
@@ -1503,7 +1517,6 @@ function spawnObject(intersect){
             }
         })
 
-        console.log(placableObject);
 
         placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
         placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y, objectRolloverMesh.position.z);    //Offset so objects aren't floating
@@ -1927,6 +1940,11 @@ function loadFlagRollover(){
     flagRollOverMesh.visible = false;
 }
 
+function notification(string){
+    notifFlag = true;
+    notif.innerHTML = string;
+}
+
 function changeMouseMode(mode)
 {
     const tool = document.getElementById("current-tool");
@@ -1938,8 +1956,7 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = none";
 
-            notifFlag = true;
-            notif.innerHTML = "No tool selected";
+            notification("No tool selected");
             break;
         case mouseMode.areaDef:
             currentMouseMode = mouseMode.areaDef;
@@ -1948,8 +1965,7 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = create area";
             
-            notifFlag = true;
-            notif.innerHTML = "Tool selected: Create area";
+            notification("Tool selected: Create area");
             break;
         case mouseMode.objectPlace:
             currentMouseMode = mouseMode.objectPlace;
@@ -1957,8 +1973,7 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = place object";
 
-            notifFlag = true;
-            notif.innerHTML = "Tool selected: Place object";
+            notification("Tool selected: Place object");
             break;
         case mouseMode.objectRemove:
             currentMouseMode = mouseMode.objectRemove;
@@ -1966,8 +1981,7 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = remove object";
 
-            notifFlag = true;
-            notif.innerHTML = "Tool selected: Remove object";
+            notification("Tool selected: Remove object");
             break;
         case mouseMode.objectMove:
             currentMouseMode = mouseMode.objectMove;
@@ -1975,8 +1989,7 @@ function changeMouseMode(mode)
             planeSelectors.forEach(item => item.visible = false);
             tool.innerHTML = " = move object";
 
-            notifFlag = true;
-            notif.innerHTML = "Tool selected: Move object";
+            notification("Tool selected: Move object");
             break;
     }
 
