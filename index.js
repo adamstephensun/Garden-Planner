@@ -1441,8 +1441,10 @@ function onPointerDown(event) {
                             if(index > -1) placedObjects.splice(index,1);
                             deleteSound.play();
                             ////Removed the object, get the object and set to place mode
-        
+
+                            
                             changeMouseMode(mouseMode.objectPlace);
+                            notification("Object picked up");
                             isMoving = true;
                         }
 
@@ -1548,6 +1550,7 @@ function spawnObject(intersect){
         }
         spawnSound.play();
 
+        notification(placableObject.name+" placed at x:"+placableObject.position.x+"  y:"+placableObject.position.z);
     });
 
 
