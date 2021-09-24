@@ -6,13 +6,12 @@ import { GUI } from "https://unpkg.com/three@0.126.1/examples/jsm/libs/dat.gui.m
 import { GLTFLoader } from "https://unpkg.com/three@0.126.1/examples/jsm/loaders/GLTFLoader.js";
 import { GLTFExporter } from "https://unpkg.com/three@0.126.1/examples/jsm/exporters/GLTFExporter.js";
 import { PointerLockControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/PointerLockControls.js"; 
-import { DragControls } from "https://unpkg.com/three@0.126.1/examples/jsm/controls/DragControls.js";
 
 //#region declarations
 let camera, listener, scene, renderer, controls, gui, world;
 let hemiLight, sunLight, moonLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
-let planeMesh, planeSelectorGeo, planeID, currentPlaneMat;
+let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
 let dragGeo, dragMeshX, dragMeshZ;
@@ -26,7 +25,7 @@ let flagRollOverMesh, flagRollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial, objectRolloverActive;
 let nodeID;
 let outlineGeo, outlineMaterial;
-let gridGeo, gridMesh, gridSnapFactor;
+let gridGeo, gridMesh, gridSnapFactor, gridSquareGeo, gridSquareMat, gridSquareNum, gridSquareID;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished, exportSuccess, canInteract, helpActive = new Boolean;
 
@@ -48,6 +47,7 @@ const outlinePoints = [];
 const placedObjects = [];
 const planeSelectors = [];
 const dragables = [];
+const gridSections = [];
 
 const areaTypes = { grass: 'Grass', soil: 'Soil', gravel: 'Gravel', stone: 'Stone' };
 
@@ -98,7 +98,7 @@ let currentMouseMode = mouseMode.areaDef;
 
 let currentObject, currentObjectPath, isMoving, currentObjectScale, currentObjectRotation, currentObjectPosition;
 let upArrowDown, downArrowDown, rightArrowDown, leftArrowDown;
-let gridSectionGeo, gridSectionMat, dragCountX, dragCountZ;
+let dragCountX, dragCountZ;
 
 //#endregion declarations
 
@@ -180,8 +180,8 @@ function init() {
 
     world = {   //World variables
         plane: {            //Controls for the plane
-            width: 50,     //change width
-            height: 50,    //change height
+            width: 100,     //change width
+            height: 100,    //change height
             type: "Grass",
             grid: true,
             snapToGrid: true,
@@ -435,6 +435,12 @@ function init() {
     planeSelectorGeo = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
     gridGeo = new THREE.PlaneGeometry(world.plane.width,world.plane.height);
 
+    gridSquareNum = 10;
+    gridSquareID = 0;
+
+    gridSquareGeo = new THREE.PlaneGeometry((world.plane.width / gridSquareNum) / 2, (world.plane.height / gridSquareNum) / 2);
+    gridSquareGeo.rotateX(-Math.PI / 2);
+
     currentPlaneMat = grassMaterial;
 
     planeID = 0;
@@ -479,10 +485,9 @@ function init() {
     leftArrowDown = false;
 
     ///////Grid///////
-    gridSectionGeo = new THREE.PlaneGeometry(1,1);
-    gridSectionGeo.rotateX(- Math.PI / 2);
     dragCountX = 0;
     dragCountZ = 0;
+    
 
     ////////First person////////
     prevTime = performance.now();       //Used for movement
@@ -626,8 +631,11 @@ function createPlane(pos){
     //gridMesh.position.set(pos.x,pos.y +0.555,pos.z);
     gridMesh.position.y += 0.555;
     gridMesh.name = "Grid "+planeID;
-    scene.add(gridMesh);
-    planeMesh.add(gridMesh);
+    //scene.add(gridMesh);
+    //planeMesh.add(gridMesh);
+
+    updateGrid(false);
+
 
 
     
@@ -648,8 +656,57 @@ function createPlane(pos){
     planeID++;
 }
 
+function updateGrid(clearCurrent){
+
+    if(clearCurrent){   //Used when you need to clear the current mesh and create a new one
+        gridSections.forEach(element => {
+            scene.remove(element)
+        });
+        gridSections.length = 0;
+    }
+
+    const planeWidth = planeMesh.scale.x.toFixed(1) * 100;  //Get width and height of plane in cm
+    const planeHeight = planeMesh.scale.z.toFixed(1) * 100;
+
+    const startX = -planeWidth / 2 + gridSquareNum / 4;     //Get the start of the for loops
+    const startZ = -planeHeight / 2 + gridSquareNum / 4;
+
+    var i,j;
+    var count = 0;
+    for(i = startX ; i < planeWidth/2 ; i += gridSquareNum / 2)
+    {
+        for(j = startZ ; j < planeHeight/2 ; j += gridSquareNum / 2)
+        {
+            //console.log("pos x:"+i+"  z:"+j);
+            const gridSquareMesh = new THREE.Mesh(gridSquareGeo, gridSquareMat);
+            gridSquareMesh.position.x = i;
+            gridSquareMesh.position.z = j;
+            gridSquareMesh.position.y = 0.555;
+            gridSquareMesh.name = "GridSection" + count;
+            gridSections.push(gridSquareMesh);
+            scene.add(gridSquareMesh);
+            count++;
+            //console.log(gridSquareMesh.name + "spawned at x:"+gridSquareMesh.position.x+"  y:"+gridSquareMesh.position.y+"  z:"+gridSquareMesh.position.z);
+        }
+    }
+
+    console.log("grid complete with "+count+" sections")
+
+}
+
 function changeCamera(fp){
     document.exitPointerLock();
+
+    var i,j;
+    var count =0;
+    for(i = 0;i<10;i++){
+        for(j = 0;j<10;j++){
+            //console.log("i:"+i+"  j:"+j);
+            count ++;
+        }
+    }
+    //console.log("count:"+count);
+
 
     if(!fp) //Orbit controls
     {
@@ -999,15 +1056,15 @@ function loadTextures() {
 
     gridTexture = new THREE.TextureLoader().load("textures/grid.png");
 
-    gridSectionMat = new THREE.MeshBasicMaterial({ 
+    gridSquareMat = new THREE.MeshBasicMaterial({
         color: 0xdddddd,
         map: gridTexture,
         transparent: true
-     })
+    })
 
     gridTexture.wrapS = THREE.RepeatWrapping;
     gridTexture.wrapT = THREE.RepeatWrapping;
-    gridTexture.repeat.set(20, 20);
+    //gridTexture.repeat.set(20, 20);
 
     gridMaterial = new THREE.MeshStandardMaterial({
         color: 0xdddddd,
@@ -1080,7 +1137,12 @@ function onPointerMove(event) {
                     objectRolloverActive = true;
     
                     objectRolloverMesh.position.copy(intersect.point).add(intersect.face.normal);
-                    if(world.plane.snapToGrid) objectRolloverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
+                    //if(world.plane.snapToGrid) objectRolloverMesh.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );
+                    if(world.plane.snapToGrid){
+                    objectRolloverMesh.position.x = currentGridpos.x;
+                    objectRolloverMesh.position.z = currentGridpos.z;
+                    }       
+
                     objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
                     objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
                     objectRolloverMesh.position.y -= 1; 
@@ -1105,6 +1167,21 @@ function onPointerMove(event) {
         else{
             if(flagRollOverMesh != null) flagRollOverMesh.visible = false;      //Removes the rollover mesh when the pointer isnt in a valid position
             if(objectRolloverMesh != null) objectRolloverMesh.visible = false;
+        }
+
+        //////Intersection for grid///////
+        const gridIntersects = raycaster.intersectObjects(gridSections);
+
+        if(gridIntersects.length > 0)
+        {
+            const intersect = gridIntersects[0];
+
+            currentGridpos = new THREE.Vector3(intersect.object.position.x, intersect.object.position.y, intersect.object.position.z);
+            
+            console.log("Grid pos"+currentGridpos.x+"  "+currentGridpos.z);
+            intersect.object.material = flagRollOverMaterial;
+            const originalObj = intersect.object;
+            if(intersect != originalObj) originalObj.material = gridSquareMat;
         }
 
         ///////Plane drag///////
@@ -1147,8 +1224,6 @@ function onPointerMove(event) {
             dragMeshX.scale.set(childScale.x, childScale.y, childScale.z);      //Prevents gizmo from scaling with the plane
             dragMeshZ.scale.set(childScale.x, childScale.y, childScale.z);
 
-            //console.log("MouseX start:"+startMouseX+"  currentX:"+mouseX+"   delta:"+mouseDeltaX);
-
             lastMouseX = mouseX;
             lastMouseY = mouseY;
 
@@ -1162,6 +1237,8 @@ function onPointerMove(event) {
             if(planeMesh.scale.z < minPlaneScale) planeMesh.scale.set(planeMesh.scale.x, planeMesh.scale.y, minPlaneScale);
 
             console.log("plane width x:"+planeMesh.scale.x.toFixed(3));
+
+            updateGrid(true);
         }
     }
 
@@ -1397,7 +1474,12 @@ function spawnObject(intersect){
         placableObject.position.copy(intersect.point).add(intersect.face.normal); //Set position to the intersect
         placableObject.position.set(objectRolloverMesh.position.x, objectRolloverMesh.position.y, objectRolloverMesh.position.z);    //Offset so objects aren't floating
     
-        if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
+        //if(world.plane.snapToGrid) placableObject.position.divideScalar( gridSnapFactor/4 ).floor().multiplyScalar( gridSnapFactor/4 ).addScalar( gridSnapFactor/8 );   //Adds grid snapping if checked
+        if(world.plane.snapToGrid){
+            placableObject.position.x = currentGridpos.x;   //Adds grid snapping if checked
+            placableObject.position.z = currentGridpos.z;   //Adds grid snapping if checked
+
+        }
         placableObject.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
         placableObject.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
         scene.add(placableObject);        //Add the object to the scene
@@ -1426,34 +1508,28 @@ function spawnObject(intersect){
 
 function onDocumentKeyDown(event) {
 
+    //////Scale and rotation//////
     switch (event.keyCode) {
         /////Arrow keys//////
         case 38:    //Arrow up - scale up
-
             upArrowDown = true;
             break; 
         case 40:    //Arrow down - scale down
-
-
             downArrowDown = true;
             break; 
         case 37:  //Arrow left - -rotation
-
-
             leftArrowDown = true;
             break; 
         case 39:  //Arrow right - +rotation
-
-
             rightArrowDown = true;  
             break; 
     }
 
+    //////Macros///////
     if(filenameInput != document.activeElement)
     {
         switch(event.keyCode)
         {
-            /////Macros/////
             case 89: //y - new area
                 changeMouseMode(mouseMode.areaDef);
                 break;
@@ -1479,6 +1555,7 @@ function onDocumentKeyDown(event) {
         }
     }
 
+    //////First person controls/////
     if(isFirstPerson){
         switch(event.code){
             case 'KeyW':
