@@ -7,7 +7,7 @@
     <title>Garden Planner</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono&family=Glory:wght@600&family=Work+Sans:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@600&Ubuntu+Mono&family=Glory:wght@600&family=Work+Sans:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
     <link href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css" rel="stylesheet">
     <style>
         body {
@@ -43,6 +43,10 @@
 
         .font-ubuntu-mono{
             font-family: 'Ubuntu Mono', monospace;
+        }
+
+        .font-roboto-mono{
+            font-family: 'Roboto Mono', monospace;
         }
 
     </style>
@@ -94,15 +98,19 @@
         </div>
 
         <div id="notif"
-        class="fixed border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 align-middle"
+        class="fixed border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 align-middle font-roboto-mono"
         style="top: 75%;transform: translate(-50%,-50%); left:50%;">
-            change!
         </div>
 
         <div id="pos-popup"
-        class="fixed border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 align-middle"
+        class="fixed border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 align-middle font-roboto-mono"
         style="top: 85%;transform: translate(-50%,-50%); left:50%;">
-            change!
+        </div>
+
+        <div id="mouseover-obj-details"
+        class="fixed border px-2 py-1 rounded-lg fill-current border-transparent bg-white bg-opacity-50 align-middle font-roboto-mono font-semibold"
+        style="top: 5%;transform: translate(-50%,-50%); left:50%;">
+            mouseover obj details!
         </div>
 
         <button id="toggle-cam"

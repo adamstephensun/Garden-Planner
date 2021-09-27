@@ -16,9 +16,10 @@ let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
 let dragGeo, dragMeshX, dragMeshZ;
 let dragFlag, planeScale, mouseDeltaX, mouseDeltaY, lastMouseX, lastMouseY, currentDragX, maxPlaneScale, minPlaneScale;
+let placedLightCount, placedLightMax;
 
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal, gridTexture;
-let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, gridMaterial;
+let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, placedObjMat;
 let starTexture, skyColour;
 
 let flagRollOverMesh, flagRollOverMaterial;
@@ -35,10 +36,10 @@ let velocity, direction;
 
 let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
-let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls, notif, notifFlag, planeChangeTimer, posPopup;
+let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls, notif, notifFlag, planeChangeTimer, posPopup, mouseoverDetails;
+let groundCheckRaycast;
 
-let timer, sunStartPos, days;
-let dayFlag = new Boolean;
+let sunStartPos;
 
 const collisionObjects = [];
 const nodes = [];
@@ -83,6 +84,9 @@ const placableObjects = {
     },
     leisure:{
         bbq: "BBQ", firepit: "Firepit", swing: "Swing", goal: "Goal", sandbox: "Sandbox"
+    },
+    lights:{
+        smallPost: "Small post", largePost: "Large post"
     }
 }
 
@@ -200,7 +204,7 @@ function init() {
         },
         lights:{
             timeScale: 3,
-            orbitRadius: 150,
+            orbitRadius: 180,
             sunCycleActive: true,
             flatLighting: false
         },
@@ -371,6 +375,16 @@ function init() {
                     currentObject = placableObjects.leisure.sandbox;
                     updateCurrentObjectPath();
                 }
+            },
+            lights:{
+                smallPost: function(){
+                    currentObject = placableObjects.lights.smallPost;
+                    updateCurrentObjectPath();
+                },
+                largePost: function(){
+                    currentObject = placableObjects.lights.largePost;
+                    updateCurrentObjectPath();
+                }
             }
         }
     }
@@ -497,6 +511,8 @@ function init() {
     canInteract = true;         //Bool to determine if the player can interact with the js scene
     objectRolloverActive = false;
     currentObjectPosition = new THREE.Vector2();
+    placedLightCount = 0;
+    placedLightMax = 10;
 
     //////Controls//////
     upArrowDown = false;
@@ -537,9 +553,7 @@ function init() {
     /////////Time/////////
     clock = new THREE.Clock(true);  //Clock for animation
     skyColour = new THREE.Color(0.980, 0.929, 0.792);   //Default sky colour, light yellow
-    dayFlag = false;
     sunStartPos = new THREE.Vector3();
-    days = 0;
     
     changeCamera(isFirstPerson);
     loadAudio();
@@ -607,6 +621,9 @@ function init() {
     posPopup = document.getElementById("pos-popup");
     posPopup.style.visibility = "hidden";
 
+    mouseoverDetails = document.getElementById("mouseover-obj-details");
+    mouseoverDetails.style.visibility = "hidden";
+
     /////disabling interaction when hovering on UI elements
     infoBox = document.getElementById("info-box");
     infoBox.addEventListener('mouseenter', function(){ canInteract = false; })  //Top left info box
@@ -645,7 +662,6 @@ function createPlane(pos){
     planeMesh.position.x = pos.x;
     planeMesh.position.z = pos.z;
     planeMesh.scale.set(planeScale.x,planeScale.y,planeScale.z);
-    console.log(planeScale);
     scene.add(planeMesh);
     collisionObjects.push(planeMesh);
 
@@ -689,21 +705,17 @@ function updateGrid(clearCurrent){
     {
         for(j = startZ ; j < planeHeight/2 ; j += gridSquareNum / 2)
         {
-            //console.log("pos x:"+i+"  z:"+j);
             const gridSquareMesh = new THREE.Mesh(gridSquareGeo, gridSquareMat);
             gridSquareMesh.position.x = i;
             gridSquareMesh.position.z = j;
             gridSquareMesh.position.y = 0.555;
-            gridSquareMesh.name = "GridSection" + count;
+            gridSquareMesh.name = "GridSection" + i+", "+j;
             gridSections.push(gridSquareMesh);
             scene.add(gridSquareMesh);
             count++;
             //console.log(gridSquareMesh.name + "spawned at x:"+gridSquareMesh.position.x+"  y:"+gridSquareMesh.position.y+"  z:"+gridSquareMesh.position.z);
         }
     }
-
-
-
     console.log("grid complete with "+count+" sections")
 
 }
@@ -843,6 +855,10 @@ function addRestOfGUI(){
     leisureFolder.add(world.objects.leisure, "swing").name("Swing");
     leisureFolder.add(world.objects.leisure, "goal").name("Goal");
     leisureFolder.add(world.objects.leisure, "sandbox").name("Sandbox");
+
+    const lightsFolder = objectFolder.addFolder("Lights");
+    lightsFolder.add(world.objects.lights, "smallPost").name("Small post");
+    lightsFolder.add(world.objects.lights, "largePost").name("Large post");
 }
 
 function updateHelp(){
@@ -974,6 +990,25 @@ function updateCurrentObjectPath(){
         case placableObjects.leisure.bbq:
             currentObjectPath = 'models/leisure/bbq.gltf';
             break;
+        case placableObjects.leisure.firepit:
+            currentObjectPath = 'models/leisure/firepit.gltf';
+            break;
+        case placableObjects.leisure.swing:
+            currentObjectPath = 'models/leisure/swing.gltf';
+            break;
+        case placableObjects.leisure.goal:
+            currentObjectPath = 'models/leisure/goal.gltf';
+            break;
+        case placableObjects.leisure.sandbox:
+            currentObjectPath = 'models/leisure/sandbox.gltf';
+            break;
+        /////Lights//////
+        case placableObjects.lights.smallPost:
+            currentObjectPath = 'models/lights/smallPost.gltf'
+            break;
+        case placableObjects.lights.largePost:
+            currentObjectPath = 'models/lights/largePost.gltf'
+            break;
     }
 
     document.getElementById("current-object").innerHTML = " = "+currentObject;
@@ -1084,19 +1119,12 @@ function loadTextures() {
         transparent: true
     })
 
-    gridTexture.wrapS = THREE.RepeatWrapping;
-    gridTexture.wrapT = THREE.RepeatWrapping;
-    //gridTexture.repeat.set(20, 20);
-
-    gridMaterial = new THREE.MeshStandardMaterial({
-        color: 0xdddddd,
-        map: gridTexture,
-        transparent: true
-    })
-
-    
     /////Other mats/////
     
+    placedObjMat = new THREE.MeshPhongMaterial({ });
+    placedObjMat.shininess = 0;
+    placedObjMat.flatShading = true;
+
     sunTexture = new THREE.TextureLoader().load("textures/sun.png");
 
     sunMaterial = new THREE.MeshStandardMaterial( { 
@@ -1135,7 +1163,7 @@ function onPointerMove(event) {
 
     if(canInteract){
 
-        ///////Rollovers///////
+        ///////Raycaster setup///////
         pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
 
         if(isFirstPerson) raycaster.setFromCamera(new THREE.Vector2(), camera);
@@ -1143,24 +1171,29 @@ function onPointerMove(event) {
 
         //////Intersection for grid///////
         if(world.plane.grid){
-            const gridIntersects = raycaster.intersectObjects(gridSections);
 
-            if(gridIntersects.length > 0)
-            {
-                const intersect = gridIntersects[0];
-                currentGridpos = new THREE.Vector3(intersect.object.position.x, intersect.object.position.y, intersect.object.position.z);
+            if(currentMouseMode == mouseMode.areaDef || currentMouseMode == mouseMode.objectPlace){
+                const gridIntersects = raycaster.intersectObjects(gridSections);
+
+                if(gridIntersects.length > 0)
+                {
+                    const intersect = gridIntersects[0];
+                    currentGridpos = new THREE.Vector3(intersect.object.position.x, intersect.object.position.y, intersect.object.position.z);
     
-                intersect.object.material = flagRollOverMaterial;
-                console.log("sel:"+selectedSection.name+"    int:"+intersect.object.name)
-                if(intersect.object.name != selectedSection.name){
-                    selectedSection.material = gridSquareMat;
-                    console.log("match");
+                    intersect.object.material = flagRollOverMaterial;
+                    if(intersect.object.name != selectedSection.name){
+                        selectedSection.material = gridSquareMat;
+                    }
+                        
+                    selectedSection = intersect.object;
                 }
-                    
-                selectedSection = intersect.object;
+                else{
+                    selectedSection.material = gridSquareMat;
+                }
             }
-        }
 
+
+        }
 
         /////Intersection for mouse modes//////
         const intersects = raycaster.intersectObjects(collisionObjects); //objects[] contains the plane
@@ -1220,6 +1253,21 @@ function onPointerMove(event) {
             if(flagRollOverMesh != null) flagRollOverMesh.visible = false;      //Removes the rollover mesh when the pointer isnt in a valid position
             if(objectRolloverMesh != null) objectRolloverMesh.visible = false;
             posPopup.style.visibility = "hidden";
+
+            mouseoverDetails.style.visibility = "hidden";
+            mouseoverDetails.innerHTML = "";
+        }
+
+        const placedIntersects = raycaster.intersectObjects(placedObjects, true);   //Intersect for placed objects, used for info box at top of screen
+
+        if(placedIntersects.length > 0){
+            const intersect = placedIntersects[0];
+            mouseoverDetails.style.visibility = "visible";
+            mouseoverDetails.innerHTML = intersect.object.parent.name+" at x:"+intersect.object.parent.position.x.toFixed(1)+"cm  y:"+intersect.object.parent.position.z.toFixed(1)+"cm";
+        }
+        else{
+            mouseoverDetails.style.visibility = "hidden";
+            mouseoverDetails.innerHTML = "";    
         }
 
         ///////Plane drag///////
@@ -1273,20 +1321,22 @@ function onPointerMove(event) {
             if(planeMesh.scale.z > maxPlaneScale) planeMesh.scale.set(planeMesh.scale.x, planeMesh.scale.y, maxPlaneScale);
             if(planeMesh.scale.z < minPlaneScale) planeMesh.scale.set(planeMesh.scale.x, planeMesh.scale.y, minPlaneScale);
 
-            updateGrid(true);
 
-            objectGroundCheck();
+            //objectGroundCheck();
         }
     }
 }
 
 function objectGroundCheck(){
     placedObjects.forEach(element => {
-        const raycaster = new THREE.Raycaster(new THREE.Vector3(element.position.x, element.position.y+1, element.position.z), new THREE.Vector3(0,-1,0));
-        const intersects = raycaster.intersectObjects(gridSections);
-        console.log(intersects);
+        //const raycaster = new THREE.Raycaster(new THREE.Vector3(element.position.x, element.position.y+1, element.position.z), new THREE.Vector3(0,-1,0));
+
+        groundCheckRaycast = new THREE.Raycaster(element.position, new THREE.Vector3(0,-1,0));
+        const intersects = groundCheckRaycast.intersectObjects(gridSections);
+        console.log("element:"+element.name+"  int:"+intersects[0]);
+
         if(intersects.length == 0){
-            console.log("intersect obj:"+element.name);
+            //console.log("intersect obj:"+element.name);
             scene.remove(element);
         }
     });
@@ -1464,9 +1514,11 @@ function onPointerDown(event) {
 
 function onPointerUp(event){
     if(canInteract){
+        if(dragFlag) updateGrid(true);
         dragFlag = false;
         dragCountX = 0;
         dragCountZ = 0;
+        
     }
 }
 
@@ -1516,6 +1568,7 @@ function spawnObject(intersect){
             if(n.isMesh){
                 n.castShadow = true;
                 n.receiveShadow = true;
+                //n.material = placedObjMat;
             }
         })
 
@@ -1534,6 +1587,33 @@ function spawnObject(intersect){
         scene.add(placableObject);        //Add the object to the scene
     
         placableObject.name = currentObject;
+
+        if(placableObject.name == "Small post" || placableObject.name == "Large post"){
+            
+            placableObject.traverse(n =>{
+                if(n.isMesh){
+                    n.castShadow = false;
+                    n.receiveShadow = true;
+                }
+            })
+
+            const light = new THREE.PointLight(0xfff833, 1, 50);
+            light.position.x = placableObject.position.x;
+            light.position.z = placableObject.position.z;
+            light.castShadow = true;
+            
+            if(placableObject.name == "Small post"){
+                light.position.y += 10;
+            }
+            if(placableObject.name == "Large post"){
+                light.position.y += 25;
+            }
+
+            scene.add(light);
+
+            const lightHelper = new THREE.PointLightHelper(light, 1);
+            scene.add(lightHelper);
+        }
     
         if(placableObject.name == "Pot" || placableObject.name == "Square raised"){                                    
             placableObject.traverse(n=>{
@@ -1562,15 +1642,19 @@ function onDocumentKeyDown(event) {
     switch (event.keyCode) {
         /////Arrow keys//////
         case 38:    //Arrow up - scale up
+            if(!upArrowDown) currentObjectScale += 1;
             upArrowDown = true;
             break; 
         case 40:    //Arrow down - scale down
+            if(!downArrowDown) currentObjectScale -= 1;
             downArrowDown = true;
             break; 
         case 37:  //Arrow left - -rotation
+            if(!leftArrowDown) currentObjectRotation += 15;
             leftArrowDown = true;
             break; 
         case 39:  //Arrow right - +rotation
+            if(!rightArrowDown) currentObjectRotation -= 15;
             rightArrowDown = true;  
             break; 
     }
@@ -1668,10 +1752,6 @@ function onDocumentKeyUp(event) {
 }
 
 function updateScaleAndRotation(){
-    if(upArrowDown) currentObjectScale += 0.1;
-    if(downArrowDown) currentObjectScale -= 0.1;
-    if(rightArrowDown) currentObjectRotation += 0.5;
-    if(leftArrowDown) currentObjectRotation -= 0.5;
 
     if(currentObjectRotation < 0 ) currentObjectRotation = 360;
     if(currentObjectRotation > 360) currentObjectRotation = 0;
@@ -1679,7 +1759,6 @@ function updateScaleAndRotation(){
 
     document.getElementById("current-scale").innerHTML = " = "+currentObjectScale.toFixed(0);
     document.getElementById("current-rotation").innerHTML = " = "+currentObjectRotation.toFixed(0)+"°";
-
 }
 
 function animate() {
@@ -1738,17 +1817,10 @@ function animate() {
         
         if(!clock.running) clock.start();
         timestamp = clock.getElapsedTime() * world.lights.timeScale *0.1;
-        //console.log("Time: "+timestamp);
 
         sunPosition.position.set(Math.cos(timestamp)*world.lights.orbitRadius,  //Set sunPos
          Math.sin(timestamp) * world.lights.orbitRadius *1.5,       //*1.5 offsets vertical orbit slightly, makes for a steeper orbit
          Math.sin(timestamp) * world.lights.orbitRadius);
-
-        //console.log(sunPosition.position.y.toFixed(0));
-
-        if(sunPosition.position.y.toFixed(0) == -225){
-            incrementDays(clock.getElapsedTime());
-        } 
 
         sunLight.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);  //Set light and sphere to sunPos
         sunSphere.position.set(sunPosition.position.x, sunPosition.position.y, sunPosition.position.z);
@@ -1824,15 +1896,6 @@ animate();
 function render(){
     renderer.render(scene, camera);
     //labelRenderer.render(scene,camera);
-}
-
-function incrementDays(timestamp){
-    if(timestamp == clock.getElapsedTime()){
-        //console.log(timestamp + "----"+clock.getElapsedTime());
-        days++;
-        //console.log("Day added: " + days)
-    }
-
 }
 
 function drawLine() {
