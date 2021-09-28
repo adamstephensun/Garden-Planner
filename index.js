@@ -38,6 +38,7 @@ let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
 let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls, notif, notifFlag, planeChangeTimer, posPopup, mouseoverDetails;
 let groundCheckRaycast;
+let focusNotif;
 
 let sunStartPos;
 
@@ -639,6 +640,9 @@ function init() {
     mouseoverDetails = document.getElementById("mouseover-obj-details");
     mouseoverDetails.style.visibility = "hidden";
 
+    focusNotif = document.getElementById("focus-notif");
+    focusNotif.style.visibility = "hidden";
+
     /////disabling interaction when hovering on UI elements
     infoBox = document.getElementById("info-box");
     infoBox.addEventListener('mouseenter', function(){ canInteract = false; })  //Top left info box
@@ -778,6 +782,7 @@ function changeCamera(fp){
             RIGHT: THREE.MOUSE.ROTATE
         }
 
+        document.getElementById("focus-notif").style.visibility = "hidden";
         document.getElementById("crosshair").style.visibility = "hidden";
         document.getElementById("controls-fp").style.visibility = "hidden";
     }
@@ -1795,6 +1800,8 @@ function animate() {
         
         if(controls.isLocked)
         {
+            focusNotif.style.visibility = "hidden";
+            crosshair.style.visibility = "visible";
             fpRaycaster.ray.origin.copy(controls.getObject().position);
             fpRaycaster.ray.origin.y -= 10;
 
@@ -1831,8 +1838,14 @@ function animate() {
 
             if(controls.getObject().position.y < -100) controls.getObject().position = new THREE.Vector3(0,10,0);
         }
+        else{
+            crosshair.style.visibility = "hidden";
+            focusNotif.style.visibility = "visible";
+        }
 
         prevTime = time;
+
+        
     }
 
     ////////Sun cycle/////////////
