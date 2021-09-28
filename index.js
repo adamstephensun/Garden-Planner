@@ -451,7 +451,7 @@ function init() {
 
     //#region drag
 
-    dragGeo = new THREE.SphereGeometry(1,32,16);
+    dragGeo = new THREE.SphereGeometry(2,32,16);
 
     //#endregion drag
 
@@ -480,6 +480,21 @@ function init() {
     notif.style.visibility = 'hidden';
 
     createPlane(new THREE.Vector3());
+
+
+    /*let sphereGeo, sphereMesh, sphereMaterial;
+
+    sphereGeo = new THREE.SphereGeometry(5,32,32);
+    sphereMaterial = new THREE.MeshPhongMaterial({
+        color: 0x1fb85a,
+        shininess: 15
+    })
+
+    sphereMesh = new THREE.Mesh(sphereGeo, sphereMaterial);
+    scene.add(sphereMesh);
+
+    sphereMesh.position.y = 15;*/
+
 
     //planeMesh.add(gridMesh);  
 
@@ -718,6 +733,12 @@ function updateGrid(clearCurrent){
     }
     console.log("grid complete with "+count+" sections")
 
+}
+
+function clearGridRollover(){
+    gridSection.forEach(element => {
+        element.material = gridSquareMat;
+    });
 }
 
 function changeCamera(fp){
@@ -1016,6 +1037,8 @@ function updateCurrentObjectPath(){
     console.log("Current object updated to: " + currentObject);
     loadObjectRollover();
 
+    notification("Selected object: "+currentObject);
+
     currentObjectScale = 10;
     currentObjectRotation = 0;
 }
@@ -1169,7 +1192,7 @@ function onPointerMove(event) {
         if(isFirstPerson) raycaster.setFromCamera(new THREE.Vector2(), camera);
         else raycaster.setFromCamera(pointer, camera);
 
-        //////Intersection for grid///////
+        //////Intersection for grid rollover///////
         if(world.plane.grid){
 
             if(currentMouseMode == mouseMode.areaDef || currentMouseMode == mouseMode.objectPlace){
@@ -1391,6 +1414,7 @@ function onPointerDown(event) {
                             if(!outlineFinished)
                             {
                                 if (collisionObjects.includes(intersect.object)){ spawnNode(intersect); }  //if intersect is included in the objects array
+                                clearGridRollover();
                             }
     
                             break;
@@ -1958,6 +1982,8 @@ function finalOutline() {
     }
     nodeID = 0; //Reset the node id counter so the next set of nodes can be deleted
     scene.remove(scene.getObjectByName("outline"));
+
+    clearGridRollover();
 }
 
 function resetOutline() {       //Clears nodes and outline points ready for a new area
