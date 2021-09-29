@@ -11,7 +11,7 @@ import { PointerLockControls } from "https://unpkg.com/three@0.126.1/examples/js
 let camera, listener, scene, renderer, controls, gui, world;
 let hemiLight, sunLight, moonLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
-let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos, selectedSection;
+let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos, selectedSection, gridLineMat, linePointsX, linePointsZ, lineGeoX, lineGeoZ, lineX, lineZ;
 let pointer, raycaster;
 let markerSound, spawnSound, deleteSound;
 let dragGeo, dragMeshX, dragMeshZ;
@@ -530,6 +530,7 @@ function init() {
     currentObjectPosition = new THREE.Vector2();
     placedLightCount = 0;
     placedLightMax = 10;
+    objectRolloverMesh = new THREE.Mesh();
 
     //////Controls//////
     upArrowDown = false;
@@ -712,6 +713,11 @@ function updateGrid(clearCurrent){
             scene.remove(element)
         });
         gridSections.length = 0;
+
+        linePointsX = [];
+        linePointsZ = [];
+        scene.remove(lineX);
+        scene.remove(lineZ);
     }
 
     const planeWidth = planeMesh.scale.x.toFixed(1) * 100;  //Get width and height of plane in cm
@@ -730,20 +736,39 @@ function updateGrid(clearCurrent){
             gridSquareMesh.position.x = i;
             gridSquareMesh.position.z = j;
             gridSquareMesh.position.y = 0.555;
-            gridSquareMesh.name = "GridSection" + i+", "+j;
+            gridSquareMesh.name = "GridSection" + count;
             gridSections.push(gridSquareMesh);
             scene.add(gridSquareMesh);
             count++;
             //console.log(gridSquareMesh.name + "spawned at x:"+gridSquareMesh.position.x+"  y:"+gridSquareMesh.position.y+"  z:"+gridSquareMesh.position.z);
         }
     }
-    console.log("grid complete with "+count+" sections")
+    
+    linePointsX = [];
+    linePointsX.push(new THREE.Vector3( (planeMesh.scale.x.toFixed(1) * 100) / 2, 0.59, 0));
+    linePointsX.push(new THREE.Vector3( -(planeMesh.scale.x.toFixed(1) * 100) / 2, 0.59, 0));
+    console.log(linePointsX);
+
+    linePointsZ = [];
+    linePointsZ.push(new THREE.Vector3( 0, 0.59, (planeMesh.scale.z.toFixed(1) * 100) / 2));
+    linePointsZ.push(new THREE.Vector3( 0, 0.59, -(planeMesh.scale.z.toFixed(1) * 100) / 2));
+    console.log(linePointsZ);
+
+    lineGeoX = new THREE.BufferGeometry().setFromPoints(linePointsX);
+    lineX = new THREE.Line(lineGeoX, gridLineMat);
+    lineX.name = "lineX";
+    scene.add(lineX);
+
+    lineGeoZ = new THREE.BufferGeometry().setFromPoints(linePointsZ);
+    lineZ = new THREE.Line(lineGeoZ, gridLineMat);
+    lineZ.name = "lineZ";
+    scene.add(lineZ);
 
 }
 
 function clearGridRollover(){
-    gridSection.forEach(element => {
-        element.material = gridSquareMat;
+    gridSections.forEach(element => {
+        if(element.isMesh) element.material = gridSquareMat;
     });
 }
 
@@ -1211,6 +1236,8 @@ function loadTextures() {
         emissiveIntensity: 0.5 
     } );
 
+    gridLineMat = new THREE.LineBasicMaterial({ color: 0x171717 });
+
     outlineMaterial = new THREE.LineBasicMaterial({ color: 0xfffffff });    //White, used for lines between area points
 
     starTexture = new THREE.TextureLoader().load("textures/stars.png");
@@ -1280,7 +1307,7 @@ function onPointerMove(event) {
                     } 
 
                     posPopup.style.visibility = "visible";
-                    posPopup.innerHTML = "x:"+(flagRollOverMesh.position.x).toFixed(1)+"cm  y:"+(flagRollOverMesh.position.z).toFixed(1)+"cm";
+                    posPopup.innerHTML = "x:"+flagRollOverMesh.position.x.toFixed(1)+"cm  y:"+flagRollOverMesh.position.z.toFixed(1)+"cm";
 
                     break;
                 case mouseMode.objectPlace:
@@ -1295,7 +1322,7 @@ function onPointerMove(event) {
                     }       
 
                     posPopup.style.visibility = "visible";
-                    posPopup.innerHTML = "x:"+objectRolloverMesh.position.x+"cm  y:"+objectRolloverMesh.position.z+"cm";
+                    posPopup.innerHTML = "x:"+objectRolloverMesh.position.x.toFixed(1)+"cm  y:"+objectRolloverMesh.position.z.toFixed(1)+"cm";
 
                     objectRolloverMesh.scale.set(currentObjectScale,currentObjectScale,currentObjectScale);  //Set scale
                     objectRolloverMesh.rotation.y = THREE.Math.degToRad(currentObjectRotation);  //Set rotation
@@ -1334,8 +1361,8 @@ function onPointerMove(event) {
             mouseoverDetails.innerHTML = intersect.object.parent.name+" at x:"+intersect.object.parent.position.x.toFixed(1)+"cm  y:"+intersect.object.parent.position.z.toFixed(1)+"cm";
         }
         else{
-            mouseoverDetails.style.visibility = "hidden";
-            mouseoverDetails.innerHTML = "";    
+            document.getElementById("mouseover-obj-details").style.visibility = "hidden";
+            document.getElementById("mouseover-obj-details").innerHTML = "";    
         }
 
         ///////Plane drag///////
@@ -1701,7 +1728,7 @@ function spawnObject(intersect){
         }
         spawnSound.play();
 
-        notification(placableObject.name+" placed at x:"+placableObject.position.x+"  y:"+placableObject.position.z);
+        notification(placableObject.name+" placed at x:"+placableObject.position.x.toFixed(1)+"  y:"+placableObject.position.z.toFixed(1));
     });
 
 
@@ -2139,6 +2166,8 @@ function changeMouseMode(mode)
             notification("Tool selected: Move object");
             break;
     }
+
+    if(mode != mouseMode.objectPlace) objectRolloverMesh.visible = false;
 
     if(mode != mouseMode.areaDef) if(outlinePoints.length >0) resetOutline();    //Auto resets area creation when switching to another tool
 }
