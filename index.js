@@ -429,6 +429,9 @@ function init() {
             element.visible = world.plane.grid;
         });
 
+        lineX.visible = world.plane.grid;
+        lineZ.visible = world.plane.grid;
+
         if(world.plane.grid) notification("Grid enabled");
         else notification("Grid disabled");
      })
@@ -740,6 +743,8 @@ function updateGrid(clearCurrent){
             gridSections.push(gridSquareMesh);
             scene.add(gridSquareMesh);
             count++;
+
+            gridSquareMesh.visible = world.plane.grid;
             //console.log(gridSquareMesh.name + "spawned at x:"+gridSquareMesh.position.x+"  y:"+gridSquareMesh.position.y+"  z:"+gridSquareMesh.position.z);
         }
     }
@@ -763,6 +768,9 @@ function updateGrid(clearCurrent){
     lineZ = new THREE.Line(lineGeoZ, gridLineMat);
     lineZ.name = "lineZ";
     scene.add(lineZ);
+
+    lineX.visible = world.plane.grid;
+    lineZ.visible = world.plane.grid;
 
 }
 
