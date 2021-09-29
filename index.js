@@ -17,6 +17,7 @@ let markerSound, spawnSound, deleteSound;
 let dragGeo, dragMeshX, dragMeshZ;
 let dragFlag, planeScale, mouseDeltaX, mouseDeltaY, lastMouseX, lastMouseY, currentDragX, maxPlaneScale, minPlaneScale;
 let placedLightCount, placedLightMax;
+let planeFolder, lightFolder, areaFolder, objectFolder;
 
 let grassTexture, grassNormal, soilTexture, soilNormal, gravelTexture, gravelNormal, stoneTexture, stoneNormal, gridTexture;
 let grassMaterial, soilMaterial, gravelMaterial, stoneMaterial, placedObjMat;
@@ -34,7 +35,7 @@ let prevTime, fpRaycaster;
 let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = new Boolean;
 let velocity, direction;
 
-let exporter, link, confirmExport, confirmExportTimer, filenameInput, infoBox;
+let exporter, link, exportButton, confirmExport, confirmExportTimer, filenameInput, infoBox;
 let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
 let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls, notif, notifFlag, planeChangeTimer, posPopup, mouseoverDetails;
 let groundCheckRaycast;
@@ -391,7 +392,7 @@ function init() {
     }
 
     //#region GUI folders
-    const planeFolder = gui.addFolder("Plane");     //Plane folder created
+    planeFolder = gui.addFolder("Plane");     //Plane folder created
     planeFolder.add(world.plane, "type").options(areaTypes).name("Terrain type").   //Terrain type selector
     onChange(()=>{
 
@@ -420,20 +421,20 @@ function init() {
                 break;
         }
         collisionObjects.push(planeMesh);
+
+        notification("Plane changed to "+world.plane.type);
     });
     planeFolder.add(world.plane, "grid").name("Enable grid").onChange(()=>{ 
         gridSections.forEach(element => {
             element.visible = world.plane.grid;
         });
 
-        notifFlag = true;
-        if(world.plane.grid) notif.innerHTML = "Grid enabled";
-        else notif.innerHTML = "Grid disabled";
+        if(world.plane.grid) notification("Grid enabled");
+        else notification("Grid disabled");
      })
     planeFolder.add(world.plane, "snapToGrid").name("Snap to grid").onChange(()=>{
-        notifFlag = true;
-        if(world.plane.snapToGrid) notif.innerHTML = "Grid snapping enabled";
-        else notif.innerHTML = "Grid snapping disabled";
+        if(world.plane.snapToGrid) notification("Grid snapping enabled");
+        else notification("Grid snapping disabled");
     });
     planeFolder.open();
 
@@ -595,7 +596,8 @@ function init() {
     document.body.appendChild(link);
     
     //////Export scene//////
-    document.getElementById('export-scene').addEventListener('click', function(){exportScene();})
+    exportButton = document.getElementById('export-scene')
+    exportButton.addEventListener('click', function(){exportScene();})
     confirmExport = document.getElementById("export-confirm");
     confirmExport.style.visibility = "hidden";
     filenameInput = document.getElementById('filename');
@@ -684,7 +686,7 @@ function createPlane(pos){
     scene.add(planeMesh);
     collisionObjects.push(planeMesh);
 
-    updateGrid(false);
+    updateGrid(true);
     
     dragMeshX = new THREE.Mesh(dragGeo, flagRollOverMaterial);
     dragMeshX.position.x = world.plane.width /2 + 5;
@@ -800,7 +802,7 @@ function changeCamera(fp){
 }
 
 function addRestOfGUI(){
-    const lightFolder = gui.addFolder("Lighting");
+    lightFolder = gui.addFolder("Lighting");
     lightFolder.add(world.lights, "timeScale", 1,10, 1).name("Orbit speed");
     lightFolder.add(world.lights, "sunCycleActive").name("Sun cycle").onChange(()=>{
         notifFlag = true;
@@ -824,13 +826,13 @@ function addRestOfGUI(){
         else notif.innerHTML = "Flat lighting disabled";
     } );
 
-    const areaFolder = gui.addFolder("Area");       //Area folder added
+    areaFolder = gui.addFolder("Area");       //Area folder added
     areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type");  //Add area type dropdown selector
     areaFolder.add(world.area, "createNew").name("New area (Y)");       //Add new area button
     areaFolder.add(world.area,"finishArea").name("Finish area (U)");    //add finish area button
     areaFolder.add(world.area, "clearAreas").name("Clear areas (I)");
 
-    const objectFolder = gui.addFolder("Objects");              //Add the objects folder
+    objectFolder = gui.addFolder("Objects");              //Add the objects folder
     objectFolder.add(world.objects, "place").name("Place (J)");     //Add place, remove, move buttons
     objectFolder.add(world.objects, "remove").name("Remove (K)");
     objectFolder.add(world.objects, "move").name("Move (L)");
@@ -896,27 +898,65 @@ function updateHelp(){
     {
         case 0:
             helpH2.innerHTML = "1: Plane";
-            helpP.innerHTML = "Welcome to garden planner! Use this tool to plan your dream garden!  <br> Use the menu on the top right of the screen to make changes. <br> Start by altering the plane by changing the terrain type and grid snapping. Click the 'New plane' button or press the Y key to select the new plane tool. Click on the white spaces to create new planes.  <br> Press the help button to close this menu. <br><br>";
+            helpP.innerHTML = "Welcome to garden planner! Use this tool to plan your dream garden!  <br> Use the menu on the top right of the screen to make changes. <br> Start by altering the plane by changing the terrain type and grid snapping. Drag the red spheres to resize the plane. <br> Press the help button again to close this menu. <br><br>";
+            
+            planeFolder.open();
+            lightFolder.close();
+            areaFolder.close();
+            objectFolder.close();
+
+            exportButton.className = exportButton.className.replace( /(?:^|\s)animate-bounce(?!\S)/g , '' );
+            
             break;
         case 1:
             helpH2.innerHTML = "2: Lighting";
             helpP.innerHTML = "Use the lighting panel to adjust the sun/moon orbit speed or disable it. <br> You can also enable flat lighting for constant lighting with no shadows. <br> <br> <br>";
+            
+            planeFolder.close();
+            lightFolder.open();
+            areaFolder.close();
+            objectFolder.close();
+            
             break;
         case 2:
             helpH2.innerHTML = "3: Area";
-            helpP.innerHTML = "This panel is used to create areas of different types on top of the main plane. <br> You can choose the type of area you want to create, then enter area creation mode by clicking the button or pressing the Q key. <br> Click on the plane to create the outer points and the area will be created on the forth point. You can also create the area with less points using the E key. <br> <br> <br>";
+            helpP.innerHTML = "This panel is used to create areas of different types on top of the main plane. <br> You can choose the type of area you want to create, then enter area creation mode by clicking the button or pressing the Q key. <br> Click on the plane to create the outer points and the area will be created on the forth point. You can also create the area with less points using the U key. <br> Remember that grid snapping can be toggled in the plane menu. <br> <br> <br>";
+            
+            planeFolder.close();
+            lightFolder.close();
+            areaFolder.open();
+            objectFolder.close();
+            
             break;
         case 3:
             helpH2.innerHTML = "4: Objects";
-            helpP.innerHTML = "The objects panel holds all the placable props in folders, such as trees, plants, and furniture.<br> There are also tools to be selected for placing objects (A key), removing objects (S key), and moving objects (D key). <br> <br> <br>";
+            helpP.innerHTML = "The objects panel holds all the placable props in folders, such as trees, plants, and furniture.<br> There are also tools to be selected for placing objects (A key), removing objects (S key), and moving objects (D key). <br> Remember that grid snapping can be toggled in the plane menu. <br> <br> <br>";
+            
+            planeFolder.close();
+            lightFolder.close();
+            areaFolder.close();
+            objectFolder.open();
+
+            toggleCamButton.className = toggleCamButton.className.replace( /(?:^|\s)animate-bounce(?!\S)/g , '' );
+
             break;
         case 4:
             helpH2.innerHTML = "5: Camera";
-            helpP.innerHTML = "There are two camera types available, orbit and first person. Click the camera button in the top left to toggle between them. <br>  "
+            helpP.innerHTML = "There are two camera types available, orbit and first person. Click the camera button in the top left to toggle between them. <br> You can still use all tools when in first person mode. <br> <br> <br>  "
+
+            toggleCamButton.className += " animate-bounce";
+
+            exportButton.className = exportButton.className.replace( /(?:^|\s)animate-bounce(?!\S)/g , '' );
+
             break;
         case 5:
             helpH2.innerHTML = "6: Exporting";
-            helpP.innerHTML = "The 'export scene' button in the top-left allows you to export the scene as a .glTF model. This includes the plane and all the objects you placed on it. <br> You can enter a file name in the field below to rename the file. <br> <br>";
+            helpP.innerHTML = "The 'export scene' button in the top-left allows you to export the scene as a .glTF model. This includes the plane and all the objects you placed on it. <br> You can enter a file name in the field below to rename the file. <br> <br> <br>";
+            
+            exportButton.className += " animate-bounce";
+
+            toggleCamButton.className = toggleCamButton.className.replace( /(?:^|\s)animate-bounce(?!\S)/g , '' );
+
             break;
     }
 }
@@ -1359,12 +1399,14 @@ function objectGroundCheck(){
     placedObjects.forEach(element => {
         //const raycaster = new THREE.Raycaster(new THREE.Vector3(element.position.x, element.position.y+1, element.position.z), new THREE.Vector3(0,-1,0));
 
-        groundCheckRaycast = new THREE.Raycaster(element.position, new THREE.Vector3(0,-1,0));
+        groundCheckRaycast = new THREE.Raycaster(element.position);
+        groundCheckRaycast.ray.origin.y = -1;
         const intersects = groundCheckRaycast.intersectObjects(gridSections);
-        console.log("element:"+element.name+"  int:"+intersects[0]);
+        const onPlane =  intersects.length > 0;
+        //console.log("element:"+element.name+"  int:"+intersects[0]);
 
-        if(intersects.length == 0){
-            //console.log("intersect obj:"+element.name);
+        if(!onPlane){
+            console.log("intersect obj:"+element.name);
             scene.remove(element);
         }
     });
@@ -1812,7 +1854,7 @@ function animate() {
 
             velocity.x -= velocity.x * 15 * delta;
             velocity.z -= velocity.z * 15 * delta;
-            velocity.y -= 9.8 * 70 * delta;    //100 = mass
+            velocity.y -= 5* 100 * delta;    //100 = mass
     
             direction.z = Number(moveForward) - Number(moveBackward);
             direction.x = Number(moveRight) - Number(moveLeft);
@@ -2109,6 +2151,8 @@ function exportScene()
     objectRolloverActive = false;
     sunSphere.visible = false;
     moonSphere.visible = false;
+    dragMeshX.visible = false;
+    dragMeshZ.visible = false;
 
     let filename = filenameInput.value;
     if(filename == "") filename = "Garden";
@@ -2128,6 +2172,8 @@ function exportScene()
     hemiLight.visible = true;
     sunSphere.visible = true;
     moonSphere.visible = true;
+    dragMeshX.visible = true;
+    dragMeshZ.visible = true;
 }
 
 function save(blob, filename)
@@ -2153,10 +2199,15 @@ function toggleHelp(){
 
     if(helpActive){
         helpBox.style.visibility = "visible";
-        gui.hide();
+        if(helpPage == 4) document.getElementById("toggle-cam").className += " animate-bounce"
+        if(helpPage == 5) document.getElementById("export-scene").className += " animate-bounce"
     }
     else {
         helpBox.style.visibility = "hidden";
-        gui.show();
+
+        document.getElementById("toggle-cam").className = document.getElementById("toggle-cam").className.replace( /(?:^|\s)animate-bounce(?!\S)/g , '' );  //Remove bounce animation from buttons
+        document.getElementById("export-scene").className = document.getElementById("export-scene").className.replace( /(?:^|\s)animate-bounce(?!\S)/g , '' );
+
+        //gui.show();
     }
 }
