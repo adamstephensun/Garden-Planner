@@ -13,7 +13,7 @@ let hemiLight, sunLight, moonLight, ambiLight;
 let sunPosition,sunGeometry, sunTexture, sunMaterial, sunSphere, moonTexture, moonMaterial, moonSphere, timestamp, clock;
 let planeMesh, planeSelectorGeo, planeID, currentPlaneMat, currentGridpos, selectedSection, gridLineMat, linePointsX, linePointsZ, lineGeoX, lineGeoZ, lineX, lineZ;
 let pointer, raycaster;
-let markerSound, spawnSound, deleteSound;
+let spawnSound, deleteSound;
 let dragGeo, dragMeshX, dragMeshZ;
 let dragFlag, planeScale, mouseDeltaX, mouseDeltaY, lastMouseX, lastMouseY, currentDragX, maxPlaneScale, minPlaneScale;
 let placedLightCount, placedLightMax;
@@ -27,7 +27,7 @@ let flagRollOverMesh, flagRollOverMaterial;
 let objectRolloverMesh, objectRolloverMaterial, objectRolloverActive;
 let nodeID;
 let outlineGeo, outlineMaterial;
-let gridGeo, gridMesh, gridSnapFactor, gridSquareGeo, gridSquareMat, gridSquareNum, gridSquareID;
+let gridSnapFactor, gridSquareGeo, gridSquareMat, gridSquareNum, gridSquareID;
 let areaGeo, areaID, areaHeightOffset, planeGeo;
 let outlineFinished, exportSuccess, canInteract, helpActive = new Boolean;
 
@@ -464,7 +464,6 @@ function init() {
     
     planeGeo = new THREE.BoxGeometry(world.plane.width, 1, world.plane.height);
     planeSelectorGeo = new THREE.PlaneGeometry(world.plane.width, world.plane.height);
-    gridGeo = new THREE.PlaneGeometry(world.plane.width,world.plane.height);
 
     gridSquareNum = 10;
     gridSquareID = 0;
@@ -782,21 +781,14 @@ function clearGridRollover(){
 }
 
 function changeCamera(fp){
+
     document.exitPointerLock();
-
-    var i,j;
-    var count =0;
-    for(i = 0;i<10;i++){
-        for(j = 0;j<10;j++){
-            //console.log("i:"+i+"  j:"+j);
-            count ++;
-        }
-    }
-    //console.log("count:"+count);
-
 
     if(!fp) //Orbit controls
     {
+        dragMeshX.visible = true;
+        dragMeshZ.visible = true;
+
         camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000); //Create the main camera
         camera.position.set(50, 80, 130);   //Set the initial position
         camera.lookAt(0, 0, 0);             //Make the camera look at the origin (position of the plane)
@@ -823,6 +815,9 @@ function changeCamera(fp){
         document.getElementById("controls-fp").style.visibility = "hidden";
     }
     else{   //FP controls
+        dragMeshX.visible = false;
+        dragMeshZ.visible = false;
+
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight,1,1000);
         camera.position.y = 10;
 
@@ -1564,6 +1559,8 @@ function onPointerDown(event) {
 
                     switch(event.which){
                         case 1: //Left click
+
+                            if(intersect.object.name == "Small post" || intersect.object.name == "Large post") placedLightCount--;
     
                             const parentId = intersect.object.parent.parent.id;
             
@@ -1711,7 +1708,7 @@ function spawnObject(intersect){
     
         placableObject.name = currentObject;
 
-        if(placableObject.name == "Small post" || placableObject.name == "Large post"){
+        if(placableObject.name == "Small post" || placableObject.name == "Large post" && placedLightCount <= placedLightMax){
             
             placableObject.traverse(n =>{
                 if(n.isMesh){
@@ -1731,6 +1728,8 @@ function spawnObject(intersect){
             if(placableObject.name == "Large post"){
                 light.position.y += 25;
             }
+
+            placedLightCount++;
 
             scene.add(light);
 
@@ -1924,9 +1923,9 @@ function animate() {
             controls.moveForward(-velocity.z * delta);
             controls.getObject().position.y += (velocity.y * delta);
 
-            if(controls.getObject().position.y < 10){
+            if(controls.getObject().position.y < 15){
                 velocity.y = 0;
-                controls.getObject().position.y = 10;
+                controls.getObject().position.y = 15;
                 canJump = true;
             }
 
