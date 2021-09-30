@@ -36,7 +36,7 @@ let isFirstPerson, moveForward, moveBackward, moveLeft, moveRight, canJump = new
 let velocity, direction;
 
 let exporter, link, exportButton, confirmExport, confirmExportTimer, filenameInput, infoBox;
-let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP; 
+let helpButton, helpBox, helpBack, helpForward, helpPage, helpH2, helpP, helpClicked; 
 let toggleCamButton, controlsBox1, controlsBox2, crosshair, fpControls, notif, notifFlag, planeChangeTimer, posPopup, mouseoverDetails;
 let groundCheckRaycast;
 let focusNotif;
@@ -534,6 +534,7 @@ function init() {
     placedLightCount = 0;
     placedLightMax = 10;
     objectRolloverMesh = new THREE.Mesh();
+    helpClicked = false;
 
     //////Controls//////
     upArrowDown = false;
@@ -621,7 +622,7 @@ function init() {
     helpP = document.getElementById("help-p");
     helpPage = 0;
     updateHelp();
-    toggleHelp();
+    //toggleHelp();
 
     //////Controls boxes/////
     controlsBox1 = document.getElementById("controls-box");
@@ -1371,6 +1372,22 @@ function onPointerMove(event) {
         else{
             document.getElementById("mouseover-obj-details").style.visibility = "hidden";
             document.getElementById("mouseover-obj-details").innerHTML = "";    
+        }
+
+        const dragablesIntersect = raycaster.intersectObjects(dragables);
+        if(dragablesIntersect.length > 0){
+            const intersect = dragablesIntersect[0];
+
+            var childScale = new THREE.Vector3(1 / planeMesh.scale.x, 1 / planeMesh.scale.y, 1 / planeMesh.scale.z);
+            childScale.x = childScale.x + 0.5;
+            childScale.y = childScale.y + 0.5;
+            childScale.z = childScale.z + 0.5;
+            intersect.object.scale.set(childScale.x, childScale.y, childScale.z);
+        }
+        if(dragablesIntersect.length == 0){
+            var childScale = new THREE.Vector3(1 / planeMesh.scale.x, 1 / planeMesh.scale.y, 1 / planeMesh.scale.z);
+            dragMeshX.scale.set(childScale.x, childScale.y, childScale.z);      //Prevents gizmo from scaling with the plane
+            dragMeshZ.scale.set(childScale.x, childScale.y, childScale.z);
         }
 
         ///////Plane drag///////
@@ -2231,6 +2248,11 @@ function saveArrayBuffer(buffer, filename)
 }
 
 function toggleHelp(){
+
+    if(!helpClicked) {
+        document.getElementById("help-button").className = document.getElementById("help-button").className.replace( /(?:^|\s)animate-ping(?!\S)/g , '' ); //Remove animation from button on first click
+        helpClicked = true;
+    }
 
     helpActive = !helpActive;
 
