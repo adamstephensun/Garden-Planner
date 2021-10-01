@@ -194,9 +194,6 @@ function init() {
         },
         area: {     //Controls for area creation
             type: "Grass",          //Dropdown for the area type to be created
-            createNew: function(){      //Button to create a new area
-                changeMouseMode(mouseMode.areaDef);   //Set the mouse mode to area creation
-            },
             finishArea: function(){
                 finalOutline();
             },
@@ -211,15 +208,6 @@ function init() {
             flatLighting: false
         },
         objects:{       //Stores all the placable objects
-            place: function(){      //Button to place objects
-                changeMouseMode(mouseMode.objectPlace);   //Changes mouse mode accordingly
-            },
-            remove: function(){     //Button to remove objects
-                changeMouseMode(mouseMode.objectRemove);
-            },
-            move: function(){       //Button to move objects
-                changeMouseMode(mouseMode.objectMove);
-            },
             trees:{     //Stores all the tree variations 
                 tree1: function(){
                     currentObject = placableObjects.trees.tree1;    //Changes the current placeable objecgt accordingly
@@ -649,6 +637,12 @@ function init() {
     focusNotif = document.getElementById("focus-notif");
     focusNotif.style.visibility = "hidden";
 
+    /////Change tool html//////
+    document.getElementById("create-area-button").addEventListener('click', function(){ changeMouseMode(mouseMode.areaDef)});
+    document.getElementById("place-object-button").addEventListener('click', function(){ changeMouseMode(mouseMode.objectPlace) });
+    document.getElementById("move-object-button").addEventListener('click', function(){ changeMouseMode(mouseMode.objectMove) });
+    document.getElementById("remove-object-button").addEventListener('click', function(){ changeMouseMode(mouseMode.objectRemove) });
+
     /////disabling interaction when hovering on UI elements
     infoBox = document.getElementById("info-box");
     infoBox.addEventListener('mouseenter', function(){ canInteract = false; })  //Top left info box
@@ -672,6 +666,8 @@ function init() {
     gui.domElement.addEventListener('mouseenter', function(){ canInteract = false; })   //Dat gui
     gui.domElement.addEventListener('mouseleave', function(){ canInteract = true; })
 
+    document.getElementById("tool-select").addEventListener('mouseenter', function(){ canInteract = false; })
+    document.getElementById("tool-select").addEventListener('mouseleave', function(){ canInteract = true; })
 
     //#endregion HTML
 
@@ -857,14 +853,10 @@ function addRestOfGUI(){
 
     areaFolder = gui.addFolder("Area");       //Area folder added
     areaFolder.add(world.area, "type").options(areaTypes).name("Terrain type");  //Add area type dropdown selector
-    areaFolder.add(world.area, "createNew").name("New area (Y)");       //Add new area button
     areaFolder.add(world.area,"finishArea").name("Finish area (U)");    //add finish area button
     areaFolder.add(world.area, "clearAreas").name("Clear areas (I)");
 
     objectFolder = gui.addFolder("Objects");              //Add the objects folder
-    objectFolder.add(world.objects, "place").name("Place (J)");     //Add place, remove, move buttons
-    objectFolder.add(world.objects, "remove").name("Remove (K)");
-    objectFolder.add(world.objects, "move").name("Move (L)");
 
     const treeFolder = objectFolder.addFolder("Trees");         //Add tree folder to the objects folder
     treeFolder.add(world.objects.trees, "tree1").name("Tree 1");
